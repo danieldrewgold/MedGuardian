@@ -1,4 +1,29 @@
-// Change this to your deployed server URL in production
-// e.g., 'https://medguardian-server.onrender.com'
-// For local development, replace with your computer's local IP (e.g., 'http://192.168.1.205:3000')
-export const API_URL = 'http://localhost:3000';
+import Constants from 'expo-constants';
+
+/**
+ * Auto-detect the scanner server URL.
+ * In development, expo-constants gives us the dev machine's IP via debuggerHost.
+ * The scanner server runs on port 3000 on that same machine.
+ * In production, set EXPO_PUBLIC_API_URL in your environment or replace the fallback.
+ */
+function getApiUrl(): string {
+  // Allow explicit override
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  // In dev, extract the host IP from Expo's debugger connection
+  if (__DEV__) {
+    const debuggerHost =
+      Constants.expoConfig?.hostUri ?? Constants.manifest2?.extra?.expoGo?.debuggerHost;
+    if (debuggerHost) {
+      const host = debuggerHost.split(':')[0]; // strip the Expo port
+      return `http://${host}:3000`;
+    }
+  }
+
+  // Fallback — update this for production deployment
+  return 'http://localhost:3000';
+}
+
+export const API_URL = getApiUrl();

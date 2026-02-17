@@ -20,6 +20,7 @@ export interface Patient {
   name: string;
   medications: Medication[];
   allergies: Allergy[];
+  notes?: string;
 }
 
 export interface Patients {

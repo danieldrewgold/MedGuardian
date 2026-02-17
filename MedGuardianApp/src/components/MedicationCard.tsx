@@ -7,9 +7,10 @@ interface Props {
   interactions: Interaction[];
   allergyConflicts: AllergyConflict[];
   onDelete: (id: number) => void;
+  onPress?: () => void;
 }
 
-export default function MedicationCard({ medication, interactions, allergyConflicts, onDelete }: Props) {
+export default function MedicationCard({ medication, interactions, allergyConflicts, onDelete, onPress }: Props) {
   const allergyConflict = allergyConflicts.find((c) => c.medication === medication.name);
   const hasInteraction = interactions.some(
     (i) => i.med1 === medication.name || i.med2 === medication.name
@@ -36,7 +37,7 @@ export default function MedicationCard({ medication, interactions, allergyConfli
     : null;
 
   return (
-    <View style={[styles.card, cardStyle]}>
+    <TouchableOpacity style={[styles.card, cardStyle]} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{medication.name}</Text>
@@ -51,7 +52,16 @@ export default function MedicationCard({ medication, interactions, allergyConfli
 
       <View style={styles.info}>
         {medication.doctor ? <Text style={styles.infoRow}>Dr. {medication.doctor}</Text> : null}
-        {medication.reason ? <Text style={styles.infoRow}>For: {medication.reason}</Text> : null}
+        {medication.reason ? (
+          <View style={styles.reasonRow}>
+            <Text style={styles.infoRow}>For: </Text>
+            {medication.reason.split(',').map((r, i) => (
+              <View key={i} style={styles.reasonChip}>
+                <Text style={styles.reasonChipText}>{r.trim()}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {medication.refillDate ? (
           <Text
             style={[
@@ -84,7 +94,7 @@ export default function MedicationCard({ medication, interactions, allergyConfli
           <Text style={styles.badgeText}>Interaction Info</Text>
         </View>
       ) : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -112,4 +122,14 @@ const styles = StyleSheet.create({
   warningBadge: { backgroundColor: '#fc8181' },
   criticalBadge: { backgroundColor: '#f56565' },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 2 },
+  reasonChip: {
+    backgroundColor: '#edf2f7',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  reasonChipText: { fontSize: 12, color: '#4a5568' },
 });

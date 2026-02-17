@@ -9,15 +9,17 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { CameraView } from 'expo-camera';
+import { CameraView, BarcodeScanningResult } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { scanBase64Image, ScanResult } from '../services/scanner';
+import { lookupNDC } from '../services/openfda';
 
 interface ScannedMed {
   id: string;
   name: string;
   dosage: string;
   doctor: string;
+  refillDate: string;
   justUpdated: boolean; // for green dot indicator
 }
 
@@ -59,6 +61,8 @@ export default function ScannerScreen({ navigation }: any) {
   const [scannedMeds, setScannedMeds] = useState<ScannedMed[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [scanCount, setScanCount] = useState(0);
+  const scannedBarcodes = useRef<Set<string>>(new Set());
+  const [barcodeLooking, setBarcodeLooking] = useState(false);
 
   // Animations
   const borderFlash = useRef(new Animated.Value(0)).current;
@@ -122,25 +126,53 @@ export default function ScannerScreen({ navigation }: any) {
       let updatedFinds: string[] = [];
 
       for (const result of results) {
-        if (!result.name && !result.dosage) continue;
+        if (!result.name && !result.dosage && !result.doctor && !result.refillDate) continue;
 
-        // Find existing match
-        const matchIndex = updated.findIndex(
-          (m) => result.name && isSameMedication(m.name, result.name)
-        );
+        // Find existing match by name
+        let matchIndex = -1;
+        if (result.name) {
+          matchIndex = updated.findIndex((m) => isSameMedication(m.name, result.name));
+        }
+
+        // If no name match but we have details (doctor, refill, dosage) and only one med exists,
+        // attribute to that med — user is likely rotating the same bottle
+        if (matchIndex < 0 && updated.length > 0 && (!result.name || result.name === '')) {
+          // No name in scan but we have other info — assign to most recent or only med
+          matchIndex = updated.length === 1 ? 0 : updated.length - 1;
+        }
+
+        // Even if there IS a name, if we only have 1 existing med, strongly prefer updating it
+        // unless the names are clearly different (not just partial reads)
+        if (matchIndex < 0 && updated.length === 1 && result.name) {
+          const existing = updated[0];
+          // If existing has no name yet, just adopt this one
+          if (!existing.name) {
+            matchIndex = 0;
+          }
+          // If both have names but they share a common word (>= 4 chars), treat as same
+          else {
+            const existingWords = existing.name.toLowerCase().split(/\s+/);
+            const resultWords = result.name.toLowerCase().split(/\s+/);
+            const hasCommon = existingWords.some(
+              (w) => w.length >= 4 && resultWords.some((rw) => rw.length >= 4 && (w.includes(rw) || rw.includes(w)))
+            );
+            if (hasCommon) matchIndex = 0;
+          }
+        }
 
         if (matchIndex >= 0) {
           // Merge into existing
           const existing = updated[matchIndex];
-          const mergedName = mergeField(existing.name, result.name);
-          const mergedDosage = mergeField(existing.dosage, result.dosage);
-          const mergedDoctor = mergeField(existing.doctor, result.doctor);
+          const mergedName = mergeField(existing.name, result.name || '');
+          const mergedDosage = mergeField(existing.dosage, result.dosage || '');
+          const mergedDoctor = mergeField(existing.doctor, result.doctor || '');
+          const mergedRefill = mergeField(existing.refillDate, result.refillDate || '');
 
-          // Only mark as updated if something actually changed
           const changed =
             mergedName !== existing.name ||
             mergedDosage !== existing.dosage ||
-            mergedDoctor !== existing.doctor;
+            mergedDoctor !== existing.doctor ||
+            mergedRefill !== existing.refillDate;
 
           if (changed) {
             updated[matchIndex] = {
@@ -148,30 +180,22 @@ export default function ScannerScreen({ navigation }: any) {
               name: mergedName,
               dosage: mergedDosage,
               doctor: mergedDoctor,
+              refillDate: mergedRefill,
               justUpdated: true,
             };
             updatedFinds.push(mergedName);
           }
         } else if (result.name) {
-          // New medication
+          // Genuinely new medication
           updated.push({
             id: `med-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             name: result.name,
             dosage: result.dosage || '',
             doctor: result.doctor || '',
+            refillDate: result.refillDate || '',
             justUpdated: true,
           });
           newFinds.push(result.name);
-        } else if (updated.length === 1 && (result.dosage || result.doctor)) {
-          // Single-bottle hint: no name found but we only have one med, assume same bottle
-          const existing = updated[0];
-          const mergedDosage = mergeField(existing.dosage, result.dosage || '');
-          const mergedDoctor = mergeField(existing.doctor, result.doctor || '');
-          const changed = mergedDosage !== existing.dosage || mergedDoctor !== existing.doctor;
-          if (changed) {
-            updated[0] = { ...existing, dosage: mergedDosage, doctor: mergedDoctor, justUpdated: true };
-            updatedFinds.push(existing.name);
-          }
         }
       }
 
@@ -198,18 +222,23 @@ export default function ScannerScreen({ navigation }: any) {
       setAnalyzing(true);
       try {
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.7,
+          quality: 0.9,
           base64: true,
           shutterSound: false,
         });
 
         if (photo?.base64) {
-          // Pass context of known medications for smarter matching
-          const knownNames = scannedMeds
+          // Pass full context of known medications for smarter matching
+          const knownMeds = scannedMeds
             .filter((m) => m.name)
-            .map((m) => `${m.name}${m.dosage ? ' ' + m.dosage : ''}`);
+            .map((m) => {
+              let desc = m.name;
+              if (m.dosage) desc += ` ${m.dosage}`;
+              if (m.doctor) desc += ` (Dr. ${m.doctor})`;
+              return desc;
+            });
 
-          const results = await scanBase64Image(photo.base64, knownNames.length > 0 ? knownNames : undefined);
+          const results = await scanBase64Image(photo.base64, knownMeds.length > 0 ? knownMeds : undefined);
           setScanCount((c) => c + 1);
 
           if (results.length > 0) {
@@ -234,6 +263,37 @@ export default function ScannerScreen({ navigation }: any) {
     };
   }, [ready, hasPermission, analyzing, scannedMeds, mergeResults]);
 
+  // Barcode scanning handler
+  const handleBarcode = useCallback(async (scanResult: BarcodeScanningResult) => {
+    const { data, type } = scanResult;
+    if (!data || scannedBarcodes.current.has(data) || barcodeLooking) return;
+
+    scannedBarcodes.current.add(data);
+    setBarcodeLooking(true);
+    showToast(`Barcode detected, looking up...`);
+
+    try {
+      const ndcResult = await lookupNDC(data);
+      if (ndcResult && ndcResult.name) {
+        mergeResults([{
+          name: ndcResult.name,
+          dosage: ndcResult.dosage,
+          doctor: '',
+          refillDate: '',
+        }]);
+      } else {
+        showToast(`No drug found for barcode ${data}`);
+        // Allow re-scan of this barcode since lookup failed
+        scannedBarcodes.current.delete(data);
+      }
+    } catch {
+      showToast('Barcode lookup failed');
+      scannedBarcodes.current.delete(data);
+    } finally {
+      setBarcodeLooking(false);
+    }
+  }, [barcodeLooking, mergeResults, showToast]);
+
   const handleDone = () => {
     if (scannedMeds.length === 0) {
       navigation.goBack();
@@ -245,6 +305,7 @@ export default function ScannerScreen({ navigation }: any) {
         name: m.name,
         dosage: m.dosage,
         doctor: m.doctor,
+        refillDate: m.refillDate,
       })),
     });
   };
@@ -270,8 +331,13 @@ export default function ScannerScreen({ navigation }: any) {
       if (result.canceled || !result.assets?.[0]?.base64) return;
 
       setAnalyzing(true);
-      const knownNames = scannedMeds.filter((m) => m.name).map((m) => m.name);
-      const results = await scanBase64Image(result.assets[0].base64, knownNames.length > 0 ? knownNames : undefined);
+      const knownMeds = scannedMeds.filter((m) => m.name).map((m) => {
+        let desc = m.name;
+        if (m.dosage) desc += ` ${m.dosage}`;
+        if (m.doctor) desc += ` (Dr. ${m.doctor})`;
+        return desc;
+      });
+      const results = await scanBase64Image(result.assets[0].base64, knownMeds.length > 0 ? knownMeds : undefined);
       setScanCount((c) => c + 1);
       if (results.length > 0) {
         mergeResults(results);
@@ -317,6 +383,10 @@ export default function ScannerScreen({ navigation }: any) {
         style={styles.camera}
         facing="back"
         onCameraReady={() => setReady(true)}
+        barcodeScannerSettings={{
+          barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8', 'code128', 'datamatrix'],
+        }}
+        onBarcodeScanned={handleBarcode}
       />
 
       {/* Green flash border */}
@@ -354,7 +424,7 @@ export default function ScannerScreen({ navigation }: any) {
         {scannedMeds.length === 0 ? (
           <View style={styles.emptyOverlay}>
             <Text style={styles.emptyText}>Point camera at pill bottles</Text>
-            <Text style={styles.emptySubtext}>Medications will appear here as they're detected</Text>
+            <Text style={styles.emptySubtext}>Scan labels or barcodes — medications appear as detected</Text>
           </View>
         ) : (
           <ScrollView style={styles.resultsList} nestedScrollEnabled>
@@ -367,10 +437,13 @@ export default function ScannerScreen({ navigation }: any) {
                     {med.dosage ? ` ${med.dosage}` : ''}
                   </Text>
                   {med.doctor ? (
-                    <Text style={styles.resultDoctor} numberOfLines={1}>{med.doctor}</Text>
+                    <Text style={styles.resultDoctor} numberOfLines={1}>Dr. {med.doctor}</Text>
                   ) : (
-                    <Text style={styles.resultNoDoctor}>No doctor info yet</Text>
+                    <Text style={styles.resultNoDoctor}>Rotate bottle to capture doctor</Text>
                   )}
+                  {med.refillDate ? (
+                    <Text style={styles.resultDoctor} numberOfLines={1}>Refill: {med.refillDate}</Text>
+                  ) : null}
                 </View>
                 <TouchableOpacity
                   style={styles.removeBtn}

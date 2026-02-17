@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Medication } from '../types';
 
 interface Props {
   medications: Medication[];
+  onPressMedication?: (medication: Medication) => void;
 }
 
 const TIME_SLOTS = [
@@ -14,7 +15,7 @@ const TIME_SLOTS = [
   { key: 'asneeded', icon: '💊', label: 'As Needed', filter: (f: string) => f.includes('as needed') },
 ];
 
-export default function ScheduleView({ medications }: Props) {
+export default function ScheduleView({ medications, onPressMedication }: Props) {
   if (medications.length === 0) return null;
 
   const slots = TIME_SLOTS.map((slot) => ({
@@ -33,9 +34,15 @@ export default function ScheduleView({ medications }: Props) {
             {slot.icon} {slot.label}
           </Text>
           {slot.meds.map((med) => (
-            <Text key={med.id} style={styles.medText}>
-              • {med.name} - {med.dosage}
-            </Text>
+            <TouchableOpacity
+              key={med.id}
+              onPress={() => onPressMedication?.(med)}
+              activeOpacity={onPressMedication ? 0.6 : 1}
+            >
+              <Text style={styles.medText}>
+                • {med.name} - {med.dosage}
+              </Text>
+            </TouchableOpacity>
           ))}
         </View>
       ))}
@@ -71,6 +78,7 @@ const styles = StyleSheet.create({
   },
   medText: {
     padding: 4,
-    color: '#2d3748',
+    color: '#667eea',
+    textDecorationLine: 'underline',
   },
 });

@@ -5,6 +5,7 @@ export interface ScanResult {
   name: string;
   dosage: string;
   doctor: string;
+  refillDate: string;
 }
 
 /**

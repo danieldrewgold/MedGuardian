@@ -6,7 +6,6 @@ import { checkInteractions, checkAllergyConflicts, checkRefillReminders } from '
 interface AppState {
   patients: Patients;
   currentPatient: string;
-  currentUserType: 'caregiver' | 'provider';
   interactions: Interaction[];
   allergyConflicts: AllergyConflict[];
   refillStatus: RefillStatus;
@@ -14,17 +13,18 @@ interface AppState {
 }
 
 interface AppContextType extends AppState {
-  setCurrentUserType: (type: 'caregiver' | 'provider') => void;
   setCurrentPatient: (id: string) => void;
   addPatient: (name: string) => string;
+  renamePatient: (id: string, newName: string) => void;
+  reorderPatients: (orderedIds: string[]) => void;
   addMedication: (med: Omit<Medication, 'id' | 'addedDate' | 'schedule'>) => void;
+  updateMedication: (id: number, med: Omit<Medication, 'id' | 'addedDate' | 'schedule'>) => void;
   deleteMedication: (id: number) => void;
   addAllergy: (name: string) => void;
   deleteAllergy: (id: number) => void;
-  clearAllData: () => Promise<void>;
-  exportData: () => string;
+  updatePatientNotes: (notes: string) => void;
   refreshInteractions: () => Promise<void>;
-  getCurrentPatient: () => { medications: Medication[]; allergies: Allergy[]; name: string };
+  getCurrentPatient: () => { medications: Medication[]; allergies: Allergy[]; name: string; notes?: string };
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -35,13 +35,12 @@ const STORAGE_KEYS = {
 };
 
 const defaultPatients: Patients = {
-  default: { name: 'Default Patient', medications: [], allergies: [] },
+  default: { name: 'My Medications', medications: [], allergies: [] },
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [patients, setPatients] = useState<Patients>(defaultPatients);
   const [currentPatient, setCurrentPatientState] = useState('default');
-  const [currentUserType, setCurrentUserType] = useState<'caregiver' | 'provider'>('caregiver');
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [allergyConflicts, setAllergyConflicts] = useState<AllergyConflict[]>([]);
   const [refillStatus, setRefillStatus] = useState<RefillStatus>({ upcoming: [], overdue: [] });
@@ -116,6 +115,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [patients, savePatients, setCurrentPatient]
   );
 
+  const renamePatient = useCallback(
+    (id: string, newName: string) => {
+      if (!patients[id] || !newName.trim()) return;
+      const newPatients = { ...patients };
+      newPatients[id] = { ...newPatients[id], name: newName.trim() };
+      savePatients(newPatients);
+    },
+    [patients, savePatients]
+  );
+
+  const reorderPatients = useCallback(
+    (orderedIds: string[]) => {
+      const newPatients: Patients = {};
+      for (const id of orderedIds) {
+        if (patients[id]) newPatients[id] = patients[id];
+      }
+      // Include any ids not in the ordered list (shouldn't happen but safety)
+      for (const id of Object.keys(patients)) {
+        if (!newPatients[id]) newPatients[id] = patients[id];
+      }
+      savePatients(newPatients);
+    },
+    [patients, savePatients]
+  );
+
   const addMedication = useCallback(
     (med: Omit<Medication, 'id' | 'addedDate' | 'schedule'>) => {
       const medication: Medication = {
@@ -128,6 +152,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       newPatients[currentPatient] = {
         ...newPatients[currentPatient],
         medications: [...newPatients[currentPatient].medications, medication],
+      };
+      savePatients(newPatients);
+    },
+    [patients, currentPatient, savePatients]
+  );
+
+  const updateMedication = useCallback(
+    (id: number, med: Omit<Medication, 'id' | 'addedDate' | 'schedule'>) => {
+      const newPatients = { ...patients };
+      newPatients[currentPatient] = {
+        ...newPatients[currentPatient],
+        medications: newPatients[currentPatient].medications.map((m) =>
+          m.id === id ? { ...m, ...med } : m
+        ),
       };
       savePatients(newPatients);
     },
@@ -175,18 +213,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [patients, currentPatient, savePatients]
   );
 
-  const clearAllData = useCallback(async () => {
-    await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
-    setPatients(defaultPatients);
-    setCurrentPatientState('default');
-    setInteractions([]);
-    setAllergyConflicts([]);
-    setRefillStatus({ upcoming: [], overdue: [] });
-  }, []);
-
-  const exportData = useCallback(() => {
-    return JSON.stringify(patients, null, 2);
-  }, [patients]);
+  const updatePatientNotes = useCallback(
+    (notes: string) => {
+      const newPatients = { ...patients };
+      newPatients[currentPatient] = {
+        ...newPatients[currentPatient],
+        notes,
+      };
+      savePatients(newPatients);
+    },
+    [patients, currentPatient, savePatients]
+  );
 
   const getCurrentPatient = useCallback(() => {
     return patients[currentPatient] || defaultPatients.default;
@@ -197,20 +234,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         patients,
         currentPatient,
-        currentUserType,
         interactions,
         allergyConflicts,
         refillStatus,
         loading,
-        setCurrentUserType,
         setCurrentPatient,
         addPatient,
+        renamePatient,
+        reorderPatients,
         addMedication,
+        updateMedication,
         deleteMedication,
         addAllergy,
         deleteAllergy,
-        clearAllData,
-        exportData,
+        updatePatientNotes,
         refreshInteractions,
         getCurrentPatient,
       }}
