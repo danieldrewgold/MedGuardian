@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Patients, Medication, Allergy, Interaction, AllergyConflict, RefillStatus } from '../types';
+import { Patients, Medication, Allergy, Interaction, AllergyConflict, RefillStatus, VisitNote } from '../types';
 import { checkInteractions, checkAllergyConflicts, checkRefillReminders } from '../services/interactions';
 
 interface AppState {
@@ -23,8 +23,11 @@ interface AppContextType extends AppState {
   addAllergy: (name: string) => void;
   deleteAllergy: (id: number) => void;
   updatePatientNotes: (notes: string) => void;
+  addVisitNote: (text: string) => void;
+  deleteVisitNote: (id: number) => void;
+  getRecentMeds: () => string[];
   refreshInteractions: () => Promise<void>;
-  getCurrentPatient: () => { medications: Medication[]; allergies: Allergy[]; name: string; notes?: string };
+  getCurrentPatient: () => { medications: Medication[]; allergies: Allergy[]; name: string; notes?: string; visitNotes?: VisitNote[]; recentMeds?: string[] };
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -149,9 +152,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         schedule: 'morning',
       };
       const newPatients = { ...patients };
+      const patient = newPatients[currentPatient];
+      // Track recently added med names (across all patients, max 20, no duplicates)
+      const prevRecent = patient.recentMeds || [];
+      const updatedRecent = [med.name, ...prevRecent.filter((n) => n.toLowerCase() !== med.name.toLowerCase())].slice(0, 20);
       newPatients[currentPatient] = {
-        ...newPatients[currentPatient],
-        medications: [...newPatients[currentPatient].medications, medication],
+        ...patient,
+        medications: [...patient.medications, medication],
+        recentMeds: updatedRecent,
       };
       savePatients(newPatients);
     },
@@ -225,6 +233,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [patients, currentPatient, savePatients]
   );
 
+  const addVisitNote = useCallback(
+    (text: string) => {
+      const note: VisitNote = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        text: text.trim(),
+      };
+      const newPatients = { ...patients };
+      const patient = newPatients[currentPatient];
+      newPatients[currentPatient] = {
+        ...patient,
+        visitNotes: [note, ...(patient.visitNotes || [])],
+      };
+      savePatients(newPatients);
+    },
+    [patients, currentPatient, savePatients]
+  );
+
+  const deleteVisitNote = useCallback(
+    (id: number) => {
+      const newPatients = { ...patients };
+      const patient = newPatients[currentPatient];
+      newPatients[currentPatient] = {
+        ...patient,
+        visitNotes: (patient.visitNotes || []).filter((n) => n.id !== id),
+      };
+      savePatients(newPatients);
+    },
+    [patients, currentPatient, savePatients]
+  );
+
+  const getRecentMeds = useCallback(() => {
+    // Gather recent meds across ALL patients for the PA
+    const allRecent: string[] = [];
+    const seen = new Set<string>();
+    Object.values(patients).forEach((p) => {
+      (p.recentMeds || []).forEach((name) => {
+        const lower = name.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          allRecent.push(name);
+        }
+      });
+    });
+    return allRecent.slice(0, 30);
+  }, [patients]);
+
   const getCurrentPatient = useCallback(() => {
     return patients[currentPatient] || defaultPatients.default;
   }, [patients, currentPatient]);
@@ -248,6 +303,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addAllergy,
         deleteAllergy,
         updatePatientNotes,
+        addVisitNote,
+        deleteVisitNote,
+        getRecentMeds,
         refreshInteractions,
         getCurrentPatient,
       }}

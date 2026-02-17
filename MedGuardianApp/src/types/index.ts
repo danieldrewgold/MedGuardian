@@ -16,11 +16,19 @@ export interface Allergy {
   addedDate: string;
 }
 
+export interface VisitNote {
+  id: number;
+  timestamp: string;
+  text: string;
+}
+
 export interface Patient {
   name: string;
   medications: Medication[];
   allergies: Allergy[];
   notes?: string;
+  visitNotes?: VisitNote[];
+  recentMeds?: string[]; // tracks recently added med names for quick-add
 }
 
 export interface Patients {

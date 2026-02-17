@@ -34,7 +34,7 @@ const COMMON_REASONS = [
 ];
 
 export default function AddMedicationScreen({ navigation, route }: any) {
-  const { addMedication, updateMedication, patients } = useApp();
+  const { addMedication, updateMedication, patients, getRecentMeds } = useApp();
   const editMed = route.params?.editMedication as import('../types').Medication | undefined;
   const scrollRef = useRef<ScrollView>(null);
 
@@ -47,6 +47,15 @@ export default function AddMedicationScreen({ navigation, route }: any) {
     });
     return Array.from(names).sort();
   }, [patients]);
+
+  // Recent medications for quick-add
+  const recentMeds = useMemo(() => getRecentMeds(), [getRecentMeds]);
+
+  const handleQuickFill = (medName: string) => {
+    setName(medName);
+    // Scroll down to the form
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200);
+  };
 
   // Scanned medications from ScannerScreen
   const [scannedMeds, setScannedMeds] = useState<ScannedMed[]>([]);
@@ -220,6 +229,33 @@ export default function AddMedicationScreen({ navigation, route }: any) {
         </TouchableOpacity>
       )}
 
+      {/* Quick Add from Recent — only show when not editing and have recent meds */}
+      {!editMed && recentMeds.length > 0 && scannedMeds.length === 0 && (
+        <View style={styles.recentSection}>
+          <Text style={styles.recentTitle}>Recent Medications</Text>
+          <Text style={styles.recentSubtitle}>Tap to pre-fill the name</Text>
+          <View style={styles.recentChips}>
+            {recentMeds.map((medName, idx) => (
+              <TouchableOpacity
+                key={`recent-${idx}`}
+                style={[
+                  styles.recentChip,
+                  name.toLowerCase() === medName.toLowerCase() && styles.recentChipActive,
+                ]}
+                onPress={() => handleQuickFill(medName)}
+              >
+                <Text style={[
+                  styles.recentChipText,
+                  name.toLowerCase() === medName.toLowerCase() && styles.recentChipTextActive,
+                ]}>
+                  {medName}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* Scanned Medications List */}
       {scannedMeds.length > 0 && (
         <View style={styles.scannedSection}>
@@ -321,7 +357,7 @@ export default function AddMedicationScreen({ navigation, route }: any) {
             fetchSuggestions={fetchDrugSuggestions}
             accentColor="#e2e8f0"
             showSubmitButton={false}
-            inputStyle={styles.input}
+            inputStyle={styles.medNameInput}
           />
         </View>
 
@@ -413,6 +449,52 @@ export default function AddMedicationScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f7fa' },
   content: { padding: 16, paddingBottom: 40 },
+
+  // Recent medications quick-add
+  recentSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  recentTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2d3748',
+    marginBottom: 2,
+  },
+  recentSubtitle: {
+    fontSize: 12,
+    color: '#a0aec0',
+    marginBottom: 10,
+  },
+  recentChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  recentChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#edf2f7',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  recentChipActive: {
+    backgroundColor: '#667eea',
+    borderColor: '#667eea',
+  },
+  recentChipText: {
+    fontSize: 13,
+    color: '#4a5568',
+  },
+  recentChipTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
 
   // Scan Bottles button
   scanBottlesBtn: {
@@ -579,6 +661,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
+    backgroundColor: '#fff',
+  },
+  medNameInput: {
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 16,
     backgroundColor: '#fff',
   },
   freqRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
