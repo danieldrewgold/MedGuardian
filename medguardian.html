@@ -1,0 +1,2489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedGuardian - Medication Information Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+        }
+
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .add-med-section {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #4a5568;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #48bb78;
+        }
+
+        .btn-secondary:hover {
+            background: #38a169;
+        }
+
+        .medications-list {
+            margin-top: 20px;
+        }
+
+        .medications-list h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+
+        .med-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            position: relative;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+        .med-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .med-card.warning {
+            border-color: #fc8181;
+            background: #fff5f5;
+        }
+
+        .med-card.critical {
+            border-color: #f56565;
+            background: #fff5f5;
+        }
+
+        .med-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .med-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .med-dosage {
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .med-expand-arrow {
+            font-size: 16px;
+            color: #a0aec0;
+            transition: transform 0.25s;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+        .med-card.expanded .med-expand-arrow {
+            transform: rotate(180deg);
+        }
+
+        .med-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .med-card.expanded .med-details {
+            max-height: 600px;
+        }
+
+        .med-details-inner {
+            padding-top: 12px;
+            margin-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .med-info {
+            font-size: 13px;
+            color: #4a5568;
+            line-height: 1.5;
+        }
+
+        .med-info-row {
+            margin-bottom: 5px;
+        }
+
+        .med-detail-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .med-detail-value {
+            font-size: 14px;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .med-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .edit-med-btn {
+            flex: 1;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .delete-btn {
+            background: #fc8181;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Inline edit mode */
+        .med-edit-form { display: none; }
+        .med-card.editing .med-edit-form { display: block; }
+        .med-card.editing .med-details-inner { display: none; }
+        .med-card.editing .med-actions { display: none; }
+        .med-edit-form input, .med-edit-form select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .med-edit-form label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #718096;
+            margin-bottom: 2px;
+            display: block;
+        }
+        .med-edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .med-edit-save {
+            flex: 1;
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .med-edit-cancel {
+            background: #e2e8f0;
+            color: #4a5568;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .warning-badge {
+            display: inline-block;
+            background: #fc8181;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+
+        .warning-badge.critical {
+            background: #f56565;
+        }
+
+        .interaction-alert {
+            background: #fff5f5;
+            border: 2px solid #fc8181;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .interaction-alert.critical {
+            border-color: #f56565;
+            background: #ffe5e5;
+        }
+
+        .interaction-alert h3 {
+            color: #c53030;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .interaction-alert p {
+            color: #742a2a;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .scan-btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .scan-btn {
+            padding: 12px;
+            background: white;
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .scan-btn:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+
+        /* Scan result feedback */
+        .scan-result-banner {
+            background: #f0fff4;
+            border: 2px solid #48bb78;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .scan-result-banner.visible { display: block; }
+        .scan-result-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            color: #276749;
+        }
+        .scan-result-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .scan-field-badge {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        .scan-field-badge.found {
+            background: #c6f6d5;
+            color: #276749;
+        }
+        .scan-field-badge.missing {
+            background: #fed7d7;
+            color: #9b2c2c;
+        }
+        .form-group.scanned input,
+        .form-group.scanned select {
+            border-color: #48bb78;
+            background: #f0fff4;
+            animation: scanPulse 1s ease-out;
+        }
+        .form-group.scanned label::after {
+            content: ' (scanned)';
+            font-weight: 400;
+            font-size: 11px;
+            color: #48bb78;
+        }
+        @keyframes scanPulse {
+            0% { box-shadow: 0 0 0 0 rgba(72,187,120,0.5); }
+            70% { box-shadow: 0 0 0 8px rgba(72,187,120,0); }
+            100% { box-shadow: none; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes cardAdded {
+            0% { background: #c6f6d5; border-color: #48bb78; }
+            100% { background: white; border-color: #e2e8f0; }
+        }
+        .med-card.just-added {
+            animation: cardAdded 2s ease-out;
+        }
+
+        .patient-selector {
+            background: white;
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .patient-selector select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+
+
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            color: #2d3748;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #a0aec0;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+        }
+
+        .info-box {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c5282;
+        }
+
+        .info-box a {
+            color: #3182ce;
+            text-decoration: none;
+        }
+
+        .info-box a:hover {
+            text-decoration: underline;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        /* Autocomplete dropdown */
+        .autocomplete-wrapper {
+            position: relative;
+        }
+
+        .autocomplete-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #667eea;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .autocomplete-dropdown.active {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #2d3748;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.15s;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.highlighted {
+            background: #ebf4ff;
+        }
+
+        .autocomplete-item .drug-name {
+            font-weight: 600;
+        }
+
+        .autocomplete-item .drug-type {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 2px;
+        }
+
+        .autocomplete-spinner {
+            padding: 12px;
+            text-align: center;
+            color: #718096;
+            font-size: 13px;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #2d3748;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 2000;
+            transition: transform 0.3s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Allergy chip styles */
+        .allergy-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: #fff5f5;
+            border: 1px solid #fc8181;
+            border-radius: 20px;
+            margin: 0 4px 6px 0;
+            font-size: 13px;
+            color: #c53030;
+            font-weight: 600;
+            cursor: default;
+        }
+        .allergy-chip .remove-allergy {
+            background: none;
+            border: none;
+            color: #fc8181;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0;
+            line-height: 1;
+        }
+        .allergy-chip .remove-allergy:hover {
+            color: #c53030;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>💊 MedGuardian</h1>
+            <p>Medication Information & Tracking Tool</p>
+        </div>
+        
+        <div class="patient-selector" id="patientSelector">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <select id="patientSelect" onchange="switchPatient()" style="flex: 1;">
+                    <option value="default">My Medications</option>
+                </select>
+                <button id="addPersonBtn" onclick="showAddPersonInput()" style="background: #667eea; color: white; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">+ Person</button>
+            </div>
+            <div id="addPersonRow" style="display: none; margin-top: 8px;">
+                <div style="display: flex; gap: 6px;">
+                    <input type="text" id="newPersonName" placeholder="Name (e.g., Mom, Dad)" style="flex: 1; padding: 8px 10px; border: 2px solid #667eea; border-radius: 6px; font-size: 13px; outline: none;" onkeydown="if(event.key==='Enter')confirmAddPerson(); if(event.key==='Escape')cancelAddPerson();">
+                    <button onclick="confirmAddPerson()" style="background: #48bb78; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;">Add</button>
+                    <button onclick="cancelAddPerson()" style="background: #e2e8f0; color: #4a5568; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;">Cancel</button>
+                </div>
+            </div>
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+                <label style="font-weight: 600; font-size: 13px; color: #4a5568; display: block; margin-bottom: 6px;">🚨 Allergies</label>
+                <div id="allergiesList" style="margin-bottom: 8px;"></div>
+                <div style="position: relative;">
+                    <div style="display: flex; gap: 6px;">
+                        <input type="text" id="allergyInput" placeholder="Type an allergy..." autocomplete="off" style="flex: 1; padding: 8px 10px; border: 2px solid #fc8181; border-radius: 6px; font-size: 13px; outline: none;">
+                        <button onclick="submitAllergy()" style="background: #fc8181; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap;">+ Add</button>
+                    </div>
+                    <div id="allergyDropdown" class="autocomplete-dropdown" style="border-color: #fc8181; z-index: 101;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalMeds">0</div>
+                    <div class="stat-label">Medications</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalInteractions">0</div>
+                    <div class="stat-label">Interactions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="criticalInteractions">0</div>
+                    <div class="stat-label">Major</div>
+                </div>
+            </div>
+
+            <div id="interactionAlerts"></div>
+
+            <div id="medicationSchedule" style="margin-bottom: 20px;"></div>
+
+            <div class="add-med-section">
+                <h2 style="margin-bottom: 15px; font-size: 16px;">Add Medication</h2>
+                
+                <div class="scan-btn-group">
+                    <div class="scan-btn" onclick="scanPillBottle()">
+                        📷 Scan Bottle
+                    </div>
+                    <div class="scan-btn" onclick="toggleManualEntry()">
+                        ✍️ Manual Entry
+                    </div>
+                </div>
+
+                <div id="scanResultBanner" class="scan-result-banner">
+                    <div class="scan-result-header">
+                        <span id="scanResultIcon">✅</span>
+                        <span id="scanResultText">Scan complete — review below</span>
+                    </div>
+                    <div class="scan-result-fields" id="scanResultFields"></div>
+                    <div style="margin-top: 8px; font-size: 12px; color: #718096;">
+                        Fields marked <span style="color: #48bb78; font-weight: 600;">(scanned)</span> were auto-filled. Edit anything that looks wrong.
+                    </div>
+                </div>
+
+                <div id="manualEntryForm" style="display: block;">
+                    <div class="form-group" id="fg-medName">
+                        <label>Medication Name *</label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="medName" placeholder="e.g., Lisinopril" autocomplete="off">
+                            <div class="autocomplete-dropdown" id="medNameDropdown"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="fg-medDosage">
+                        <label>Dosage *</label>
+                        <input type="text" id="medDosage" placeholder="e.g., 10mg">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Frequency</label>
+                        <select id="medFrequency">
+                            <option value="Once daily">Once daily</option>
+                            <option value="Twice daily">Twice daily</option>
+                            <option value="Three times daily">Three times daily</option>
+                            <option value="Four times daily">Four times daily</option>
+                            <option value="Every 12 hours">Every 12 hours</option>
+                            <option value="Every other day">Every other day</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="As needed">As needed</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="fg-medDoctor">
+                        <label>Prescribing Doctor</label>
+                        <input type="text" id="medDoctor" placeholder="e.g., Dr. Smith">
+                    </div>
+
+                    <div class="form-group">
+                        <label>What is this for? (optional)</label>
+                        <input type="text" id="medReason" placeholder="e.g., High blood pressure">
+                    </div>
+
+                    <div class="form-group" id="fg-medRefillDate">
+                        <label>Next Refill Date (optional)</label>
+                        <input type="date" id="medRefillDate">
+                        <div id="daysSupplyCalc" style="margin-top: 8px;">
+                            <button type="button" onclick="toggleDaysSupply()" style="background: none; border: 1px solid #cbd5e0; border-radius: 6px; padding: 6px 10px; font-size: 12px; color: #667eea; cursor: pointer;">
+                                📅 Calculate from days supply
+                            </button>
+                            <div id="daysSupplyInputs" style="display: none; margin-top: 8px; display: none;">
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="number" id="daysSupplyNum" min="1" max="365" placeholder="Days" style="width: 80px; padding: 8px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;">
+                                    <span style="font-size: 13px; color: #718096;">days from today</span>
+                                    <button type="button" onclick="applyDaysSupply()" style="background: #667eea; color: white; border: none; border-radius: 6px; padding: 8px 12px; font-size: 12px; cursor: pointer; font-weight: 600;">
+                                        Set
+                                    </button>
+                                </div>
+                                <div style="margin-top: 6px; font-size: 11px; color: #a0aec0;">Common: 30, 60, or 90 days</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn" onclick="addMedication()">Add Medication</button>
+                    <div style="height: 60px;"></div>
+                </div>
+            </div>
+
+            <div class="medications-list">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Current Medications</h2>
+                    <button class="btn-secondary" style="padding: 8px 16px; font-size: 14px; width: auto;" onclick="exportMedList()">
+                        📤 Share List
+                    </button>
+                </div>
+                <div id="medicationsList"></div>
+            </div>
+        </div>
+        <div style="padding: 16px 20px; text-align: center; font-size: 11px; color: #a0aec0; line-height: 1.5;">* General medication info from public databases (RxNorm, FDA). Not medical advice.</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Share Modal -->
+    <div class="modal" id="shareModal" onclick="if(event.target===this)closeShareModal()">
+        <div class="modal-content" style="padding: 20px;">
+            <div class="modal-header" style="margin-bottom: 16px;">
+                <h2 style="font-size: 18px;">📤 Share Medication List</h2>
+                <button class="close-btn" onclick="closeShareModal()">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button onclick="doShare('sms')" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #f7fafc; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-size: 15px; text-align: left; transition: all 0.15s;">
+                    <span style="font-size: 22px;">💬</span>
+                    <div><strong>Text / SMS</strong><div style="font-size: 12px; color: #718096;">Send via messaging app</div></div>
+                </button>
+                <button onclick="doShare('email')" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #f7fafc; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-size: 15px; text-align: left; transition: all 0.15s;">
+                    <span style="font-size: 22px;">📧</span>
+                    <div><strong>Email</strong><div style="font-size: 12px; color: #718096;">Send to doctor or family</div></div>
+                </button>
+                <button onclick="doShare('copy')" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #f7fafc; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-size: 15px; text-align: left; transition: all 0.15s;">
+                    <span style="font-size: 22px;">📋</span>
+                    <div><strong>Copy to Clipboard</strong><div style="font-size: 12px; color: #718096;">Paste anywhere</div></div>
+                </button>
+                <button onclick="doShare('download')" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #f7fafc; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-size: 15px; text-align: left; transition: all 0.15s;">
+                    <span style="font-size: 22px;">📄</span>
+                    <div><strong>Download File</strong><div style="font-size: 12px; color: #718096;">Save as text file</div></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Drug interaction database (Information from medical databases - for reference only)
+        const CRITICAL_INTERACTIONS = [
+            {
+                drug1: 'warfarin',
+                drug2: 'aspirin',
+                severity: 'major',
+                description: 'These medications may increase bleeding risk when taken together.',
+                info: 'Consult your healthcare provider or pharmacist about taking these medications together.'
+            },
+            {
+                drug1: 'lisinopril',
+                drug2: 'spironolactone',
+                severity: 'major',
+                description: 'These medications may increase potassium levels, which could affect heart function.',
+                info: 'Your healthcare provider should monitor potassium levels if taking both medications.'
+            },
+            {
+                drug1: 'metformin',
+                drug2: 'contrast dye',
+                severity: 'major',
+                description: 'Metformin may need to be stopped before procedures involving contrast dye.',
+                info: 'Inform your doctor and radiologist if you take metformin before imaging procedures.'
+            },
+            {
+                drug1: 'warfarin',
+                drug2: 'nsaid',
+                severity: 'moderate',
+                description: 'NSAIDs (ibuprofen, naproxen) may increase bleeding risk with warfarin.',
+                info: 'Discuss pain relief options with your healthcare provider.'
+            },
+            {
+                drug1: 'lisinopril',
+                drug2: 'ibuprofen',
+                severity: 'moderate',
+                description: 'NSAIDs may reduce effectiveness of blood pressure medications.',
+                info: 'Ask your pharmacist about alternative pain relievers.'
+            },
+            {
+                drug1: 'metformin',
+                drug2: 'alcohol',
+                severity: 'moderate',
+                description: 'Alcohol may increase certain risks when combined with metformin.',
+                info: 'Discuss alcohol consumption with your healthcare provider.'
+            },
+            {
+                drug1: 'simvastatin',
+                drug2: 'amlodipine',
+                severity: 'moderate',
+                description: 'Amlodipine may increase simvastatin levels in the body.',
+                info: 'Your doctor may adjust dosages. Report any unusual muscle pain or weakness.'
+            },
+            {
+                drug1: 'digoxin',
+                drug2: 'furosemide',
+                severity: 'moderate',
+                description: 'These medications may affect potassium levels when taken together.',
+                info: 'Your healthcare provider may monitor potassium levels regularly.'
+            }
+        ];
+
+        // Cache for RxNorm drug lookups to avoid repeated API calls
+        let rxnormCache = {};
+
+        async function getRxCUI(drugName) {
+            // Check cache first
+            if (rxnormCache[drugName.toLowerCase()]) {
+                return rxnormCache[drugName.toLowerCase()];
+            }
+
+            try {
+                // Search RxNorm for drug name to get RxCUI (unique drug identifier)
+                const searchUrl = `https://rxnav.nlm.nih.gov/REST/drugs.json?name=${encodeURIComponent(drugName)}`;
+                const response = await fetch(searchUrl);
+                const data = await response.json();
+                
+                if (data.drugGroup && data.drugGroup.conceptGroup) {
+                    for (const group of data.drugGroup.conceptGroup) {
+                        if (group.conceptProperties && group.conceptProperties.length > 0) {
+                            const rxcui = group.conceptProperties[0].rxcui;
+                            rxnormCache[drugName.toLowerCase()] = rxcui;
+                            return rxcui;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('RxNorm lookup error for', drugName, ':', error);
+            }
+            
+            return null;
+        }
+
+        async function checkRxNormInteractions(rxcui1, rxcui2) {
+            try {
+                const url = `https://rxnav.nlm.nih.gov/REST/interaction/interaction.json?rxcui=${rxcui1}&sources=DrugBank`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const interactions = [];
+                
+                if (data.interactionTypeGroup) {
+                    for (const typeGroup of data.interactionTypeGroup) {
+                        if (typeGroup.interactionType) {
+                            for (const type of typeGroup.interactionType) {
+                                if (type.interactionPair) {
+                                    for (const pair of type.interactionPair) {
+                                        // Check if this interaction involves our second drug
+                                        const interactionConcept = pair.interactionConcept;
+                                        if (interactionConcept) {
+                                            for (const concept of interactionConcept) {
+                                                if (concept.minConceptItem && concept.minConceptItem.rxcui === rxcui2) {
+                                                    interactions.push({
+                                                        description: pair.description || 'Interaction detected',
+                                                        severity: pair.severity || 'moderate'
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return interactions;
+            } catch (error) {
+                console.error('RxNorm interaction check error:', error);
+                return [];
+            }
+        }
+
+        // App state
+        let currentPatient = 'default';
+        let patients = {
+            'default': {
+                name: 'My Medications',
+                medications: [],
+                allergies: []
+            }
+        };
+        // Server URL for backend API (bottle scanning)
+        const SERVER_URL = 'http://localhost:3000';
+
+        // Initialize
+        loadData();
+        renderMedications();
+
+        // ===== Mobile keyboard fix: scroll focused inputs into view =====
+        document.querySelectorAll('#manualEntryForm input, #manualEntryForm select').forEach(el => {
+            el.addEventListener('focus', function() {
+                setTimeout(() => {
+                    this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
+        });
+
+        // ===== RxNorm Autocomplete =====
+        (function initAutocomplete() {
+            const input = document.getElementById('medName');
+            const dropdown = document.getElementById('medNameDropdown');
+            let debounceTimer = null;
+            let highlightIndex = -1;
+            let currentResults = [];
+            let abortController = null;
+
+            input.addEventListener('input', function() {
+                const query = this.value.trim();
+                clearTimeout(debounceTimer);
+
+                if (query.length < 2) {
+                    closeDropdown();
+                    return;
+                }
+
+                // Show loading indicator
+                dropdown.innerHTML = '<div class="autocomplete-spinner">Searching medications...</div>';
+                dropdown.classList.add('active');
+                highlightIndex = -1;
+
+                debounceTimer = setTimeout(() => fetchSuggestions(query), 300);
+            });
+
+            async function fetchSuggestions(query) {
+                // Cancel previous request
+                if (abortController) abortController.abort();
+                abortController = new AbortController();
+
+                try {
+                    const url = `https://rxnav.nlm.nih.gov/REST/spellingsuggestions.json?name=${encodeURIComponent(query)}`;
+                    const response = await fetch(url, { signal: abortController.signal });
+                    const data = await response.json();
+
+                    let suggestions = [];
+                    if (data.suggestionGroup && data.suggestionGroup.suggestionList) {
+                        suggestions = data.suggestionGroup.suggestionList.suggestion || [];
+                    }
+
+                    // Also try approximateTerm for better results
+                    const url2 = `https://rxnav.nlm.nih.gov/REST/approximateTerm.json?term=${encodeURIComponent(query)}&maxEntries=8`;
+                    const response2 = await fetch(url2, { signal: abortController.signal });
+                    const data2 = await response2.json();
+
+                    let approxResults = [];
+                    if (data2.approximateGroup && data2.approximateGroup.candidate) {
+                        approxResults = data2.approximateGroup.candidate
+                            .map(c => c.name)
+                            .filter(Boolean);
+                    }
+
+                    // Merge and deduplicate, preferring approximate results
+                    const seen = new Set();
+                    const merged = [];
+
+                    // Approximate results first (usually better matches)
+                    for (const name of approxResults) {
+                        const lower = name.toLowerCase();
+                        if (!seen.has(lower)) {
+                            seen.add(lower);
+                            merged.push(name);
+                        }
+                    }
+
+                    // Then spelling suggestions
+                    for (const name of suggestions) {
+                        const lower = name.toLowerCase();
+                        if (!seen.has(lower)) {
+                            seen.add(lower);
+                            merged.push(name);
+                        }
+                    }
+
+                    // Limit to 8 results
+                    currentResults = merged.slice(0, 8);
+                    renderDropdown();
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('RxNorm autocomplete error:', err);
+                        closeDropdown();
+                    }
+                }
+            }
+
+            function renderDropdown() {
+                if (currentResults.length === 0) {
+                    dropdown.innerHTML = '<div class="autocomplete-spinner">No matches found</div>';
+                    dropdown.classList.add('active');
+                    return;
+                }
+
+                dropdown.innerHTML = currentResults.map((name, i) => `
+                    <div class="autocomplete-item ${i === highlightIndex ? 'highlighted' : ''}"
+                         data-index="${i}"
+                         onmousedown="event.preventDefault()"
+                         onclick="selectAutocomplete(${i})">
+                        <div class="drug-name">${highlightMatch(name, input.value.trim())}</div>
+                    </div>
+                `).join('');
+                dropdown.classList.add('active');
+            }
+
+            function highlightMatch(text, query) {
+                const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                return text.replace(regex, '<strong style="color: #667eea;">$1</strong>');
+            }
+
+            function closeDropdown() {
+                dropdown.classList.remove('active');
+                dropdown.innerHTML = '';
+                currentResults = [];
+                highlightIndex = -1;
+            }
+
+            // Keyboard navigation
+            input.addEventListener('keydown', function(e) {
+                if (!dropdown.classList.contains('active') || currentResults.length === 0) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    highlightIndex = Math.min(highlightIndex + 1, currentResults.length - 1);
+                    renderDropdown();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    highlightIndex = Math.max(highlightIndex - 1, -1);
+                    renderDropdown();
+                } else if (e.key === 'Enter') {
+                    if (highlightIndex >= 0) {
+                        e.preventDefault();
+                        selectAutocomplete(highlightIndex);
+                    }
+                } else if (e.key === 'Escape') {
+                    closeDropdown();
+                }
+            });
+
+            // Close dropdown on blur
+            input.addEventListener('blur', function() {
+                // Small delay so onclick on dropdown items fires first
+                setTimeout(closeDropdown, 150);
+            });
+
+            // Expose select function globally
+            window.selectAutocomplete = function(index) {
+                if (index >= 0 && index < currentResults.length) {
+                    input.value = currentResults[index];
+                    closeDropdown();
+                    // Move focus to next field
+                    document.getElementById('medDosage').focus();
+                    // Look up what this medication is for
+                    fetchIndication(currentResults[index]);
+                }
+            };
+
+            // Also fetch indication when user manually types a name and leaves the field
+            let lastLookedUp = '';
+            input.addEventListener('blur', function() {
+                const val = this.value.trim();
+                if (val.length >= 3 && val !== lastLookedUp) {
+                    lastLookedUp = val;
+                    fetchIndication(val);
+                }
+            });
+        })();
+
+        // ===== "What is this for?" indication suggestion =====
+        let indicationAbort = null;
+
+        async function fetchIndication(drugName) {
+            const reasonInput = document.getElementById('medReason');
+
+            // Don't overwrite if user already typed something
+            if (reasonInput.value.trim()) return;
+
+            // Reset placeholder while loading
+            reasonInput.placeholder = 'Looking up common uses...';
+
+            if (indicationAbort) indicationAbort.abort();
+            indicationAbort = new AbortController();
+
+            try {
+                const url = `https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${encodeURIComponent(drugName)}"+openfda.brand_name:"${encodeURIComponent(drugName)}"&limit=1`;
+                const response = await fetch(url, { signal: indicationAbort.signal });
+
+                if (!response.ok) {
+                    reasonInput.placeholder = 'e.g., High blood pressure';
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.results && data.results[0]) {
+                    const label = data.results[0];
+                    let indication = '';
+
+                    if (label.indications_and_usage && label.indications_and_usage[0]) {
+                        indication = label.indications_and_usage[0];
+                    } else if (label.purpose && label.purpose[0]) {
+                        indication = label.purpose[0];
+                    }
+
+                    if (indication) {
+                        // Clean up: strip HTML, truncate, simplify
+                        indication = indication.replace(/<[^>]+>/g, '').trim();
+                        // Grab the first sentence or first 120 chars
+                        const firstSentence = indication.match(/^[^.]+\./);
+                        if (firstSentence && firstSentence[0].length <= 150) {
+                            indication = firstSentence[0].trim();
+                        } else if (indication.length > 120) {
+                            indication = indication.substring(0, 120).trim() + '...';
+                        }
+                        reasonInput.placeholder = indication;
+                        return;
+                    }
+                }
+
+                reasonInput.placeholder = 'e.g., High blood pressure';
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    reasonInput.placeholder = 'e.g., High blood pressure';
+                }
+            }
+        }
+
+        // ===== Refill date: Calculate from days supply =====
+        function toggleDaysSupply() {
+            const inputs = document.getElementById('daysSupplyInputs');
+            inputs.style.display = inputs.style.display === 'none' ? 'block' : 'none';
+            if (inputs.style.display === 'block') {
+                document.getElementById('daysSupplyNum').focus();
+            }
+        }
+
+        function applyDaysSupply() {
+            const days = parseInt(document.getElementById('daysSupplyNum').value);
+            if (!days || days < 1 || days > 365) {
+                alert('Please enter a number between 1 and 365.');
+                return;
+            }
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            // Format as YYYY-MM-DD for the date input
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            document.getElementById('medRefillDate').value = `${yyyy}-${mm}-${dd}`;
+            // Hide the calculator
+            document.getElementById('daysSupplyInputs').style.display = 'none';
+            document.getElementById('daysSupplyNum').value = '';
+        }
+
+
+
+
+        function showAddPersonInput() {
+            document.getElementById('addPersonRow').style.display = 'block';
+            document.getElementById('addPersonBtn').style.display = 'none';
+            document.getElementById('newPersonName').value = '';
+            document.getElementById('newPersonName').focus();
+        }
+
+        function cancelAddPerson() {
+            document.getElementById('addPersonRow').style.display = 'none';
+            document.getElementById('addPersonBtn').style.display = '';
+        }
+
+        function confirmAddPerson() {
+            const name = document.getElementById('newPersonName').value.trim();
+            if (!name) return;
+            const id = 'patient_' + Date.now();
+            patients[id] = { name, medications: [], allergies: [] };
+            currentPatient = id;
+            updatePatientSelector();
+            saveData();
+            renderMedications();
+            cancelAddPerson();
+            showToast(`Added "${name}"`);
+        }
+
+        function submitAllergy() {
+            const input = document.getElementById('allergyInput');
+            const allergy = input.value.trim();
+            if (!allergy) return;
+
+            if (!patients[currentPatient].allergies) {
+                patients[currentPatient].allergies = [];
+            }
+
+            // Check for duplicate
+            const exists = patients[currentPatient].allergies.some(
+                a => a.name.toLowerCase() === allergy.toLowerCase()
+            );
+            if (exists) {
+                showToast(`"${allergy}" already added`);
+                input.value = '';
+                return;
+            }
+
+            patients[currentPatient].allergies.push({
+                id: Date.now(),
+                name: allergy,
+                addedDate: new Date().toISOString()
+            });
+            input.value = '';
+            document.getElementById('allergyDropdown').classList.remove('active');
+            saveData();
+            renderAllergies();
+            renderMedications();
+            showToast(`Added allergy: ${allergy}`);
+        }
+
+        // Allergy autocomplete
+        (function initAllergyAutocomplete() {
+            const input = document.getElementById('allergyInput');
+            const dropdown = document.getElementById('allergyDropdown');
+            let debounceTimer = null;
+            let allergyResults = [];
+            let allergyHighlight = -1;
+            let allergyAbort = null;
+
+            // Common allergen suggestions (drug classes + common non-drug allergens)
+            const COMMON_ALLERGENS = [
+                'Penicillin', 'Sulfa / Sulfonamide', 'Cephalosporin', 'Aspirin',
+                'NSAIDs', 'Codeine', 'Opioids', 'Tetracycline', 'Fluoroquinolone',
+                'Macrolide', 'Erythromycin', 'Latex', 'Iodine', 'Contrast dye',
+                'ACE Inhibitor', 'Statin', 'Benzodiazepine', 'SSRI', 'Beta Blocker',
+            ];
+
+            input.addEventListener('input', function() {
+                const query = this.value.trim();
+                clearTimeout(debounceTimer);
+                allergyHighlight = -1;
+
+                if (query.length < 1) {
+                    closeAllergyDropdown();
+                    return;
+                }
+
+                // Immediately filter common allergens
+                const filtered = COMMON_ALLERGENS.filter(
+                    a => a.toLowerCase().includes(query.toLowerCase())
+                );
+
+                if (query.length < 2) {
+                    allergyResults = filtered.slice(0, 6);
+                    renderAllergyDropdown(query);
+                    return;
+                }
+
+                // Show local matches first, then fetch from RxNorm
+                allergyResults = filtered.slice(0, 4);
+                renderAllergyDropdown(query);
+
+                debounceTimer = setTimeout(() => fetchAllergyRxNorm(query, filtered), 300);
+            });
+
+            async function fetchAllergyRxNorm(query, localResults) {
+                if (allergyAbort) allergyAbort.abort();
+                allergyAbort = new AbortController();
+
+                try {
+                    const url = `https://rxnav.nlm.nih.gov/REST/spellingsuggestions.json?name=${encodeURIComponent(query)}`;
+                    const response = await fetch(url, { signal: allergyAbort.signal });
+                    const data = await response.json();
+
+                    let rxResults = [];
+                    if (data.suggestionGroup && data.suggestionGroup.suggestionList) {
+                        rxResults = (data.suggestionGroup.suggestionList.suggestion || []).slice(0, 5);
+                    }
+
+                    // Merge: local first, then RxNorm, dedup
+                    const seen = new Set(localResults.map(s => s.toLowerCase()));
+                    allergyResults = [...localResults.slice(0, 4)];
+                    for (const r of rxResults) {
+                        if (!seen.has(r.toLowerCase())) {
+                            seen.add(r.toLowerCase());
+                            allergyResults.push(r);
+                        }
+                    }
+                    allergyResults = allergyResults.slice(0, 8);
+                    renderAllergyDropdown(query);
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('Allergy autocomplete error:', e);
+                }
+            }
+
+            function renderAllergyDropdown(query) {
+                if (allergyResults.length === 0) {
+                    dropdown.classList.remove('active');
+                    return;
+                }
+                const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                dropdown.innerHTML = allergyResults.map((name, i) => `
+                    <div class="autocomplete-item ${i === allergyHighlight ? 'highlighted' : ''}"
+                         onmousedown="event.preventDefault()"
+                         onclick="selectAllergyAutocomplete(${i})">
+                        <div class="drug-name">${name.replace(regex, '<strong style=\"color: #c53030;\">$1</strong>')}</div>
+                    </div>
+                `).join('');
+                dropdown.classList.add('active');
+            }
+
+            function closeAllergyDropdown() {
+                dropdown.classList.remove('active');
+                dropdown.innerHTML = '';
+                allergyResults = [];
+                allergyHighlight = -1;
+            }
+
+            input.addEventListener('keydown', function(e) {
+                if (!dropdown.classList.contains('active') || allergyResults.length === 0) {
+                    if (e.key === 'Enter') { submitAllergy(); return; }
+                    return;
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    allergyHighlight = Math.min(allergyHighlight + 1, allergyResults.length - 1);
+                    renderAllergyDropdown(input.value.trim());
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    allergyHighlight = Math.max(allergyHighlight - 1, -1);
+                    renderAllergyDropdown(input.value.trim());
+                } else if (e.key === 'Enter') {
+                    if (allergyHighlight >= 0) {
+                        e.preventDefault();
+                        selectAllergyAutocomplete(allergyHighlight);
+                    } else {
+                        submitAllergy();
+                    }
+                } else if (e.key === 'Escape') {
+                    closeAllergyDropdown();
+                }
+            });
+
+            input.addEventListener('blur', function() {
+                setTimeout(closeAllergyDropdown, 150);
+            });
+
+            window.selectAllergyAutocomplete = function(index) {
+                if (index >= 0 && index < allergyResults.length) {
+                    input.value = allergyResults[index];
+                    closeAllergyDropdown();
+                    submitAllergy();
+                }
+            };
+        })();
+
+        function deleteAllergy(id) {
+            const allergy = (patients[currentPatient].allergies || []).find(a => a.id === id);
+            const name = allergy ? allergy.name : 'this allergy';
+            if (confirm(`Remove "${name}" from allergies?`)) {
+                patients[currentPatient].allergies = patients[currentPatient].allergies.filter(a => a.id !== id);
+                saveData();
+                renderAllergies();
+                renderMedications();
+                showToast(`Removed "${name}"`);
+            }
+        }
+
+        function renderAllergies() {
+            const allergiesList = document.getElementById('allergiesList');
+            const allergies = patients[currentPatient].allergies || [];
+
+            if (allergies.length === 0) {
+                allergiesList.innerHTML = '<div style="color: #a0aec0; font-style: italic; font-size: 12px;">No allergies recorded</div>';
+                return;
+            }
+
+            allergiesList.innerHTML = '<div style="display: flex; flex-wrap: wrap;">' +
+                allergies.map(allergy => `
+                    <span class="allergy-chip">
+                        ⚠️ ${allergy.name}
+                        <button class="remove-allergy" onclick="deleteAllergy(${allergy.id})" title="Remove">×</button>
+                    </span>
+                `).join('') + '</div>';
+        }
+
+        function switchPatient() {
+            const select = document.getElementById('patientSelect');
+            currentPatient = select.value;
+            renderMedications();
+        }
+
+        function updatePatientSelector() {
+            const select = document.getElementById('patientSelect');
+            select.innerHTML = '';
+            Object.keys(patients).forEach(id => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = patients[id].name;
+                if (id === currentPatient) option.selected = true;
+                select.appendChild(option);
+            });
+        }
+
+        function toggleManualEntry() {
+            const form = document.getElementById('manualEntryForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function scanPillBottle() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.capture = 'environment'; // Use back camera on mobile
+
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // Show loading state on scan button
+                const scanBtn = document.querySelector('.scan-btn');
+                const originalText = scanBtn.innerHTML;
+                scanBtn.innerHTML = '⏳ Analyzing label...';
+                scanBtn.style.opacity = '0.7';
+                scanBtn.style.pointerEvents = 'none';
+
+                try {
+                    await processBottleImage(file);
+                } catch (error) {
+                    alert('Error scanning bottle: ' + error.message);
+                } finally {
+                    scanBtn.innerHTML = originalText;
+                    scanBtn.style.opacity = '';
+                    scanBtn.style.pointerEvents = '';
+                }
+            };
+
+            input.click();
+        }
+
+        async function processBottleImage(file) {
+            // Convert image to base64
+            const base64 = await fileToBase64(file);
+
+            // Use Claude API to extract medication info from image
+            const extractedData = await extractMedicationFromImage(base64);
+
+            if (extractedData) {
+                // Clear previous scan highlights
+                clearScanHighlights();
+
+                // Field mapping: { key, inputId, formGroupId, label }
+                const fieldMap = [
+                    { key: 'name', inputId: 'medName', fgId: 'fg-medName', label: 'Name' },
+                    { key: 'dosage', inputId: 'medDosage', fgId: 'fg-medDosage', label: 'Dosage' },
+                    { key: 'doctor', inputId: 'medDoctor', fgId: 'fg-medDoctor', label: 'Doctor' },
+                    { key: 'refillDate', inputId: 'medRefillDate', fgId: 'fg-medRefillDate', label: 'Refill' },
+                ];
+
+                const foundFields = [];
+                const missingFields = [];
+
+                for (const f of fieldMap) {
+                    const val = (extractedData[f.key] || '').trim();
+                    if (val) {
+                        // Handle refill date — try to parse into YYYY-MM-DD for the date input
+                        if (f.key === 'refillDate') {
+                            const dateMatch = val.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (dateMatch) {
+                                document.getElementById(f.inputId).value = dateMatch[0];
+                            } else {
+                                // Show raw refill text as a note below the date input
+                                let hint = document.getElementById('refillScanHint');
+                                if (!hint) {
+                                    hint = document.createElement('div');
+                                    hint.id = 'refillScanHint';
+                                    hint.style.cssText = 'font-size:12px;color:#48bb78;margin-top:4px;font-style:italic;';
+                                    document.getElementById(f.inputId).parentNode.insertBefore(hint, document.getElementById(f.inputId).nextSibling);
+                                }
+                                hint.textContent = 'Scanned: ' + val;
+                            }
+                        } else {
+                            document.getElementById(f.inputId).value = val;
+                        }
+                        // Highlight the form group
+                        const fg = document.getElementById(f.fgId);
+                        if (fg) fg.classList.add('scanned');
+                        foundFields.push(f.label);
+                    } else {
+                        missingFields.push(f.label);
+                    }
+                }
+
+                // Show scan result banner
+                const banner = document.getElementById('scanResultBanner');
+                const fieldsDiv = document.getElementById('scanResultFields');
+                const resultText = document.getElementById('scanResultText');
+                const resultIcon = document.getElementById('scanResultIcon');
+
+                fieldsDiv.innerHTML = '';
+                for (const name of foundFields) {
+                    fieldsDiv.innerHTML += `<span class="scan-field-badge found">${name}</span>`;
+                }
+                for (const name of missingFields) {
+                    fieldsDiv.innerHTML += `<span class="scan-field-badge missing">${name} — not found</span>`;
+                }
+
+                if (foundFields.length >= 2) {
+                    resultIcon.textContent = '✅';
+                    resultText.textContent = `Scanned ${foundFields.length} field${foundFields.length > 1 ? 's' : ''} — review below`;
+                } else if (foundFields.length === 1) {
+                    resultIcon.textContent = '⚠️';
+                    resultText.textContent = 'Partial scan — please fill in missing fields';
+                } else {
+                    resultIcon.textContent = '❌';
+                    resultText.textContent = 'Could not read label — please enter manually';
+                }
+                banner.classList.add('visible');
+
+                // Show the manual entry form
+                document.getElementById('manualEntryForm').style.display = 'block';
+
+                // Trigger indication lookup if name was found
+                if (extractedData.name && typeof fetchIndication === 'function') {
+                    fetchIndication(extractedData.name);
+                }
+
+                // Scroll to banner
+                banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function clearScanHighlights() {
+            // Remove all scanned highlights from form groups
+            document.querySelectorAll('.form-group.scanned').forEach(el => el.classList.remove('scanned'));
+            // Hide the banner
+            const banner = document.getElementById('scanResultBanner');
+            if (banner) banner.classList.remove('visible');
+            // Remove refill scan hint if present
+            const hint = document.getElementById('refillScanHint');
+            if (hint) hint.remove();
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function extractMedicationFromImage(base64Image) {
+            // Send to backend server for analysis
+            try {
+                // Strip the data URL prefix to get raw base64
+                const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+
+                const response = await fetch(`${SERVER_URL}/api/scan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Data })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Server error (${response.status})`);
+                }
+
+                const data = await response.json();
+
+                if (data.medications && data.medications.length > 0) {
+                    // Server returns [{name, dosage, doctor}] — map first result
+                    const med = data.medications[0];
+                    return {
+                        name: med.name || '',
+                        dosage: med.dosage || '',
+                        doctor: med.doctor || '',
+                        refillDate: ''
+                    };
+                }
+
+                throw new Error('Could not read medication label');
+
+            } catch (error) {
+                console.error('Scan error:', error);
+
+                let msg = 'Scanning Error\n\n';
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    msg += 'Cannot reach the server. Make sure the MedGuardian server is running.';
+                } else {
+                    msg += error.message;
+                }
+
+                alert('❌ ' + msg);
+                document.getElementById('manualEntryForm').style.display = 'block';
+                return null;
+            }
+        }
+
+        async function addMedication() {
+            const name = document.getElementById('medName').value.trim();
+            const dosage = document.getElementById('medDosage').value.trim();
+            const frequency = document.getElementById('medFrequency').value;
+            const doctor = document.getElementById('medDoctor').value.trim();
+            const reason = document.getElementById('medReason').value.trim();
+            const refillDate = document.getElementById('medRefillDate').value;
+
+            if (!name || !dosage) {
+                showToast('Name and dosage are required');
+                return;
+            }
+
+            // Duplicate check
+            const existing = patients[currentPatient].medications.find(
+                m => m.name.toLowerCase() === name.toLowerCase()
+            );
+            if (existing) {
+                if (!confirm(`You already have "${existing.name}" (${existing.dosage}) added. Add anyway?`)) {
+                    return;
+                }
+            }
+
+            // Allergy safety check
+            const allergyMatch = await checkAllergyBeforeAdd(name);
+            if (allergyMatch) {
+                if (!confirm(`⚠️ ALLERGY WARNING\n\nYou have a recorded allergy to "${allergyMatch.allergy}".\n\n${allergyMatch.reason}\n\nOnly add this if prescribed by a doctor who knows about this allergy.\n\nAdd ${name} anyway?`)) {
+                    return;
+                }
+            }
+
+            const medication = {
+                id: Date.now(),
+                name: name,
+                dosage: dosage,
+                frequency: frequency,
+                doctor: doctor,
+                reason: reason,
+                refillDate: refillDate || null,
+                addedDate: new Date().toISOString(),
+                schedule: 'morning' // default
+            };
+
+            patients[currentPatient].medications.push(medication);
+            saveData();
+            await renderMedications();
+
+            // Highlight the newly added card
+            const newCard = document.querySelector(`.med-card[data-med-id="${medication.id}"]`);
+            if (newCard) {
+                newCard.classList.add('just-added');
+                newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => newCard.classList.remove('just-added'), 2000);
+            }
+            showToast(`Added ${name}`);
+
+            // Clear form and scan highlights
+            document.getElementById('medName').value = '';
+            document.getElementById('medDosage').value = '';
+            document.getElementById('medDoctor').value = '';
+            document.getElementById('medReason').value = '';
+            document.getElementById('medReason').placeholder = 'e.g., High blood pressure';
+            document.getElementById('medRefillDate').value = '';
+            clearScanHighlights();
+        }
+
+        function toggleMedCard(event, card) {
+            // Don't toggle when clicking buttons or inputs inside the card
+            if (event.target.closest('button, input, select, .med-edit-form')) return;
+            card.classList.toggle('expanded');
+        }
+
+        function startMedEdit(event, btn) {
+            event.stopPropagation();
+            const card = btn.closest('.med-card');
+            card.classList.add('editing');
+        }
+
+        function cancelMedEdit(event, btn) {
+            event.stopPropagation();
+            const card = btn.closest('.med-card');
+            card.classList.remove('editing');
+        }
+
+        function saveMedEdit(event, id) {
+            event.stopPropagation();
+            const card = event.target.closest('.med-card');
+            const med = patients[currentPatient].medications.find(m => m.id === id);
+            if (!med) return;
+
+            const newName = card.querySelector('.edit-name').value.trim();
+            const newDosage = card.querySelector('.edit-dosage').value.trim();
+            if (!newName || !newDosage) {
+                showToast('Name and dosage are required');
+                return;
+            }
+
+            med.name = newName;
+            med.dosage = newDosage;
+            med.frequency = card.querySelector('.edit-frequency').value;
+            med.doctor = card.querySelector('.edit-doctor').value.trim();
+            med.reason = card.querySelector('.edit-reason').value.trim();
+            med.refillDate = card.querySelector('.edit-refill').value || null;
+
+            saveData();
+            renderMedications();
+            showToast(`Updated ${newName}`);
+        }
+
+        function markAsRefilled(event, id) {
+            event.stopPropagation();
+            const med = patients[currentPatient].medications.find(m => m.id === id);
+            if (!med) return;
+            // Set refill date to 30 days from today
+            const date = new Date();
+            date.setDate(date.getDate() + 30);
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            med.refillDate = `${yyyy}-${mm}-${dd}`;
+            saveData();
+            renderMedications();
+            showToast(`${med.name} refill set to ${mm}/${dd}`);
+        }
+
+        function deleteMedication(id) {
+            if (window.event) window.event.stopPropagation();
+            const med = patients[currentPatient].medications.find(m => m.id === id);
+            const medName = med ? med.name : 'this medication';
+            if (confirm(`Remove ${medName}? This can't be undone.`)) {
+                patients[currentPatient].medications = patients[currentPatient].medications.filter(m => m.id !== id);
+                saveData();
+                renderMedications();
+            }
+        }
+
+        async function checkInteractions(medications) {
+            const interactions = [];
+            
+            // First, check our critical hand-curated list (better messaging)
+            medications.forEach((med1, i) => {
+                medications.forEach((med2, j) => {
+                    if (i >= j) return;
+
+                    const name1 = med1.name.toLowerCase();
+                    const name2 = med2.name.toLowerCase();
+
+                    CRITICAL_INTERACTIONS.forEach(interaction => {
+                        const match1 = (name1.includes(interaction.drug1) && name2.includes(interaction.drug2));
+                        const match2 = (name1.includes(interaction.drug2) && name2.includes(interaction.drug1));
+                        
+                        if (match1 || match2) {
+                            interactions.push({
+                                med1: med1.name,
+                                med2: med2.name,
+                                severity: interaction.severity,
+                                description: interaction.description,
+                                info: interaction.info,
+                                source: 'reference_database'
+                            });
+                        }
+                    });
+                });
+            });
+
+            // Then check RxNorm for additional interactions
+            try {
+                for (let i = 0; i < medications.length; i++) {
+                    for (let j = i + 1; j < medications.length; j++) {
+                        const med1 = medications[i];
+                        const med2 = medications[j];
+                        
+                        // Skip if we already found this in critical list
+                        const alreadyFound = interactions.some(int => 
+                            (int.med1 === med1.name && int.med2 === med2.name) ||
+                            (int.med1 === med2.name && int.med2 === med1.name)
+                        );
+                        
+                        if (alreadyFound) continue;
+                        
+                        // Get RxCUIs for both drugs
+                        const rxcui1 = await getRxCUI(med1.name);
+                        const rxcui2 = await getRxCUI(med2.name);
+                        
+                        if (rxcui1 && rxcui2) {
+                            console.log(`Checking RxNorm interaction: ${med1.name} (${rxcui1}) + ${med2.name} (${rxcui2})`);
+                            
+                            const rxnormInteractions = await checkRxNormInteractions(rxcui1, rxcui2);
+                            
+                            rxnormInteractions.forEach(rxInteraction => {
+                                interactions.push({
+                                    med1: med1.name,
+                                    med2: med2.name,
+                                    severity: rxInteraction.severity === 'high' ? 'major' : 'moderate',
+                                    description: rxInteraction.description,
+                                    info: 'Consult your healthcare provider or pharmacist for more information about this interaction.',
+                                    source: 'rxnorm'
+                                });
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('RxNorm interaction checking error:', error);
+                interactions._rxnormFailed = true;
+            }
+
+            return interactions;
+        }
+
+        async function renderMedications() {
+            const medications = patients[currentPatient].medications;
+            const allergies = patients[currentPatient].allergies || [];
+            
+            // Show loading state while checking interactions
+            const alertsContainer = document.getElementById('interactionAlerts');
+            alertsContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #667eea;"><span class="loading-spinner"></span> Checking for drug interactions...</div>';
+            
+            const interactions = await checkInteractions(medications);
+            const allergyConflicts = checkAllergyConflicts(medications, allergies);
+            const refillStatus = checkRefillReminders();
+            
+            // Update stats
+            document.getElementById('totalMeds').textContent = medications.length;
+            document.getElementById('totalInteractions').textContent = interactions.length + allergyConflicts.length;
+            document.getElementById('criticalInteractions').textContent = 
+                interactions.filter(i => i.severity === 'major').length + allergyConflicts.length;
+
+            // Render allergy conflicts first (most critical)
+            let alertsHTML = '';
+            
+            // Add refill alerts
+            if (refillStatus.overdue.length > 0) {
+                alertsHTML += refillStatus.overdue.map(med => `
+                    <div class="interaction-alert critical">
+                        <h3>📅 REFILL REMINDER: ${med.name}</h3>
+                        <p><strong>Refill date was ${med.daysOverdue} days ago</strong></p>
+                        <p><strong>Reminder:</strong> Contact your pharmacy or healthcare provider to refill this medication if needed.</p>
+                    </div>
+                `).join('');
+            }
+            
+            if (refillStatus.upcoming.length > 0) {
+                alertsHTML += refillStatus.upcoming.map(med => `
+                    <div class="interaction-alert warning">
+                        <h3>⏰ UPCOMING REFILL: ${med.name}</h3>
+                        <p><strong>Refill date in ${med.daysUntil} days (${new Date(med.refillDate).toLocaleDateString()})</strong></p>
+                        <p><strong>Reminder:</strong> You may want to contact your pharmacy to arrange a refill.</p>
+                    </div>
+                `).join('');
+            }
+            
+            if (allergyConflicts.length > 0) {
+                alertsHTML += allergyConflicts.map(conflict => `
+                    <div class="interaction-alert critical">
+                        <h3>⚠️ ALLERGY INFORMATION: ${conflict.medication}</h3>
+                        <p><strong>Patient has documented allergy to:</strong> ${conflict.allergy}</p>
+                        ${conflict.reason ? `<p><strong>Why flagged:</strong> ${conflict.reason}</p>` : ''}
+                        <p><strong>Information:</strong> Taking medications you're allergic to may cause serious reactions. Consult your healthcare provider immediately if this medication was prescribed to you.</p>
+                        <p style="font-size: 12px; color: #718096; margin-top: 8px;">This is an informational alert based on your allergy list. Always verify medications with your healthcare provider.</p>
+                    </div>
+                `).join('');
+            }
+
+            // Render interaction alerts
+            if (interactions.length > 0) {
+                alertsHTML += interactions.map(interaction => `
+                    <div class="interaction-alert ${interaction.severity === 'major' ? 'critical' : 'warning'}">
+                        <h3>ℹ️ INTERACTION INFORMATION*: ${interaction.med1} + ${interaction.med2}</h3>
+                        <p><strong>Severity:</strong> ${interaction.severity === 'major' ? 'Major' : 'Moderate'}</p>
+                        <p><strong>Information:</strong> ${interaction.description}</p>
+                        <p><strong>Guidance:</strong> ${interaction.info}</p>
+                        <p style="font-size: 12px; color: #718096; margin-top: 8px;">
+                            ${interaction.source === 'rxnorm' ? 'Source: RxNorm Drug Database (NIH)' : 'Source: Medical Reference Database'}
+                            <br>This is general drug information. For medical advice specific to your situation, consult your healthcare provider.
+                        </p>
+                    </div>
+                `).join('');
+            }
+            
+            if (interactions._rxnormFailed) {
+                alertsHTML += `<div style="background: #fffaf0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #718096; margin-bottom: 10px;">
+                    Unable to check online interactions right now. Showing saved medications only.
+                </div>`;
+            }
+
+            alertsContainer.innerHTML = alertsHTML || '';
+
+            // Render allergies list
+            renderAllergies();
+
+            // Render medication schedule
+            renderSchedule(medications);
+
+            // Render medication list
+            const listContainer = document.getElementById('medicationsList');
+            
+            if (medications.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p style="font-size: 16px; margin-bottom: 6px;">No medications added yet</p>
+                        <p style="font-size: 13px;">Add your first medication using the buttons above.<br>Scan a pill bottle or enter manually.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Check which meds have interactions or allergy conflicts
+            const medsWithIssues = new Set();
+            interactions.forEach(interaction => {
+                medications.forEach(med => {
+                    if (med.name === interaction.med1 || med.name === interaction.med2) {
+                        medsWithIssues.add(med.id);
+                    }
+                });
+            });
+            
+            allergyConflicts.forEach(conflict => {
+                medications.forEach(med => {
+                    if (med.name === conflict.medication) {
+                        medsWithIssues.add(med.id);
+                    }
+                });
+            });
+
+            listContainer.innerHTML = medications.map(med => {
+                const hasIssue = medsWithIssues.has(med.id);
+                const allergyConflict = allergyConflicts.find(c => c.medication === med.name);
+                const criticalInteraction = interactions.find(i =>
+                    (i.med1 === med.name || i.med2 === med.name) && i.severity === 'major'
+                );
+                const medInteractions = interactions.filter(i =>
+                    i.med1 === med.name || i.med2 === med.name
+                );
+
+                // Refill info
+                let refillHTML = '';
+                if (med.refillDate) {
+                    const daysUntil = Math.ceil((new Date(med.refillDate) - new Date()) / (1000 * 60 * 60 * 24));
+                    let refillText = new Date(med.refillDate).toLocaleDateString();
+                    let refillStyle = '';
+                    let refillBtn = '';
+                    if (daysUntil < 0) {
+                        refillText += ` (${Math.abs(daysUntil)} days overdue)`;
+                        refillStyle = 'color: #c53030; font-weight: 600;';
+                        refillBtn = `<button onclick="markAsRefilled(event, ${med.id})" style="margin-left: 8px; background: #48bb78; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">Mark as Refilled</button>`;
+                    } else if (daysUntil <= 7) {
+                        refillText += ` (in ${daysUntil} days)`;
+                        refillStyle = 'color: #d69e2e; font-weight: 600;';
+                        refillBtn = `<button onclick="markAsRefilled(event, ${med.id})" style="margin-left: 8px; background: #48bb78; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">Mark as Refilled</button>`;
+                    }
+                    refillHTML = `<div class="med-detail-label">Next Refill</div>
+                        <div class="med-detail-value" style="${refillStyle}">${refillText}${refillBtn}</div>`;
+                }
+
+                // Interaction details for this med
+                let interactionHTML = '';
+                if (medInteractions.length > 0) {
+                    interactionHTML = `<div class="med-detail-label">Interactions</div>` +
+                        medInteractions.map(i => {
+                            const otherMed = i.med1 === med.name ? i.med2 : i.med1;
+                            return `<div style="background: ${i.severity === 'major' ? '#fff5f5' : '#fffaf0'}; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 13px;">
+                                <strong style="color: ${i.severity === 'major' ? '#c53030' : '#c05621'};">${i.severity === 'major' ? 'Major' : 'Moderate'}</strong> with <strong>${otherMed}</strong>
+                                <div style="color: #4a5568; margin-top: 2px;">${i.description}</div>
+                            </div>`;
+                        }).join('');
+                }
+                if (allergyConflict) {
+                    interactionHTML += `<div style="background: #fff5f5; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 13px;">
+                        <strong style="color: #c53030;">Allergy</strong>: Patient has documented allergy to <strong>${allergyConflict.allergy}</strong>
+                        ${allergyConflict.reason ? `<div style="color: #718096; margin-top: 2px; font-size: 12px;">${allergyConflict.reason}</div>` : ''}
+                    </div>`;
+                }
+
+                // Badge for collapsed view
+                let badgeHTML = '';
+                if (allergyConflict) {
+                    badgeHTML = '<span class="warning-badge critical">⚠️ Allergy</span>';
+                } else if (criticalInteraction) {
+                    badgeHTML = '<span class="warning-badge critical">ℹ️ Interaction</span>';
+                } else if (hasIssue) {
+                    badgeHTML = '<span class="warning-badge">ℹ️ Interaction</span>';
+                }
+
+                return `
+                    <div class="med-card ${allergyConflict ? 'critical' : criticalInteraction ? 'critical' : hasIssue ? 'warning' : ''}" onclick="toggleMedCard(event, this)" data-med-id="${med.id}">
+                        <div class="med-header">
+                            <div>
+                                <div class="med-name">${med.name}</div>
+                                <div class="med-dosage">${med.dosage} — ${med.frequency}${badgeHTML ? ' ' + badgeHTML : ''}</div>
+                            </div>
+                            <span class="med-expand-arrow">▼</span>
+                        </div>
+                        <div class="med-details">
+                            <div class="med-details-inner">
+                                ${med.doctor ? `<div class="med-detail-label">Prescribing Doctor</div>
+                                    <div class="med-detail-value">${med.doctor}</div>` : ''}
+                                ${med.reason ? `<div class="med-detail-label">Reason</div>
+                                    <div class="med-detail-value">${med.reason}</div>` : ''}
+                                ${refillHTML}
+                                <div class="med-detail-label">Frequency</div>
+                                <div class="med-detail-value">${med.frequency}</div>
+                                <div class="med-detail-label">Added</div>
+                                <div class="med-detail-value" style="color: #a0aec0;">${new Date(med.addedDate).toLocaleDateString()}</div>
+                                ${interactionHTML}
+                            </div>
+                            <div class="med-edit-form">
+                                <label>Name</label>
+                                <input type="text" class="edit-name" value="${med.name}">
+                                <label>Dosage</label>
+                                <input type="text" class="edit-dosage" value="${med.dosage}">
+                                <label>Frequency</label>
+                                <select class="edit-frequency">
+                                    ${['Once daily','Twice daily','Three times daily','Four times daily','Every 12 hours','Every other day','Weekly','As needed','Other'].map(f =>
+                                        `<option value="${f}" ${med.frequency === f ? 'selected' : ''}>${f}</option>`
+                                    ).join('')}
+                                </select>
+                                <label>Doctor</label>
+                                <input type="text" class="edit-doctor" value="${med.doctor || ''}">
+                                <label>Reason</label>
+                                <input type="text" class="edit-reason" value="${med.reason || ''}">
+                                <label>Refill Date</label>
+                                <input type="date" class="edit-refill" value="${med.refillDate || ''}">
+                                <div class="med-edit-actions">
+                                    <button class="med-edit-save" onclick="saveMedEdit(event, ${med.id})">Save</button>
+                                    <button class="med-edit-cancel" onclick="cancelMedEdit(event, this)">Cancel</button>
+                                </div>
+                            </div>
+                            <div class="med-actions">
+                                <button class="edit-med-btn" onclick="startMedEdit(event, this)">Edit</button>
+                                <button class="delete-btn" onclick="deleteMedication(${med.id})">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Drug class mappings for allergy cross-referencing
+        const DRUG_CLASS_MAP = {
+            'penicillin': ['amoxicillin', 'ampicillin', 'augmentin', 'amoxicillin/clavulanate', 'piperacillin', 'nafcillin', 'oxacillin', 'dicloxacillin', 'penicillin v', 'penicillin g'],
+            'sulfa': ['sulfamethoxazole', 'trimethoprim/sulfamethoxazole', 'bactrim', 'septra', 'sulfasalazine', 'sulfadiazine', 'dapsone'],
+            'sulfonamide': ['sulfamethoxazole', 'trimethoprim/sulfamethoxazole', 'bactrim', 'septra', 'sulfasalazine', 'sulfadiazine', 'dapsone'],
+            'cephalosporin': ['cephalexin', 'keflex', 'cefdinir', 'omnicef', 'ceftriaxone', 'cefazolin', 'cefuroxime', 'cefpodoxime', 'cefixime', 'ceftazidime', 'cefepime'],
+            'nsaid': ['ibuprofen', 'advil', 'motrin', 'naproxen', 'aleve', 'aspirin', 'celecoxib', 'celebrex', 'meloxicam', 'indomethacin', 'diclofenac', 'ketorolac', 'piroxicam'],
+            'statin': ['atorvastatin', 'lipitor', 'simvastatin', 'zocor', 'rosuvastatin', 'crestor', 'pravastatin', 'lovastatin', 'fluvastatin', 'pitavastatin'],
+            'ace inhibitor': ['lisinopril', 'enalapril', 'ramipril', 'benazepril', 'captopril', 'fosinopril', 'quinapril', 'perindopril', 'trandolapril', 'moexipril'],
+            'opioid': ['morphine', 'oxycodone', 'hydrocodone', 'codeine', 'fentanyl', 'tramadol', 'methadone', 'hydromorphone', 'oxymorphone', 'meperidine', 'vicodin', 'percocet', 'norco'],
+            'tetracycline': ['tetracycline', 'doxycycline', 'minocycline', 'demeclocycline', 'tigecycline'],
+            'fluoroquinolone': ['ciprofloxacin', 'cipro', 'levofloxacin', 'levaquin', 'moxifloxacin', 'avelox', 'ofloxacin', 'norfloxacin'],
+            'macrolide': ['azithromycin', 'zithromax', 'z-pack', 'erythromycin', 'clarithromycin', 'biaxin'],
+            'benzodiazepine': ['diazepam', 'valium', 'lorazepam', 'ativan', 'alprazolam', 'xanax', 'clonazepam', 'klonopin', 'midazolam', 'temazepam'],
+            'ssri': ['fluoxetine', 'prozac', 'sertraline', 'zoloft', 'escitalopram', 'lexapro', 'citalopram', 'celexa', 'paroxetine', 'paxil', 'fluvoxamine'],
+            'beta blocker': ['metoprolol', 'atenolol', 'propranolol', 'carvedilol', 'bisoprolol', 'nebivolol', 'labetalol', 'nadolol', 'sotalol'],
+            'calcium channel blocker': ['amlodipine', 'norvasc', 'diltiazem', 'nifedipine', 'verapamil', 'felodipine', 'nicardipine'],
+            'arb': ['losartan', 'cozaar', 'valsartan', 'diovan', 'irbesartan', 'avapro', 'olmesartan', 'candesartan', 'telmisartan', 'azilsartan'],
+        };
+
+        /**
+         * Check if a medication name conflicts with any of the patient's allergies.
+         * Uses direct name matching + drug class cross-referencing.
+         * Returns { allergy, reason } if conflict found, or null.
+         */
+        async function checkAllergyBeforeAdd(medName) {
+            const allergies = patients[currentPatient].allergies || [];
+            if (allergies.length === 0) return null;
+
+            const medLower = medName.toLowerCase();
+
+            for (const allergy of allergies) {
+                const allergyLower = allergy.name.toLowerCase();
+
+                // Direct name match (bidirectional substring)
+                if (medLower.includes(allergyLower) || allergyLower.includes(medLower)) {
+                    return {
+                        allergy: allergy.name,
+                        reason: `"${medName}" matches your recorded allergy to "${allergy.name}".`
+                    };
+                }
+
+                // Drug class check: is the allergy a drug class?
+                for (const [className, members] of Object.entries(DRUG_CLASS_MAP)) {
+                    // Check if allergy matches a class name
+                    if (allergyLower.includes(className) || className.includes(allergyLower)) {
+                        // Check if medication is a member of that class
+                        if (members.some(m => medLower.includes(m) || m.includes(medLower))) {
+                            return {
+                                allergy: allergy.name,
+                                reason: `"${medName}" belongs to the ${className} drug class, and you have an allergy to "${allergy.name}".`
+                            };
+                        }
+                    }
+
+                    // Reverse: is the allergy a specific drug in a class, and the new med is also in that class?
+                    if (members.some(m => allergyLower.includes(m) || m.includes(allergyLower))) {
+                        if (members.some(m => medLower.includes(m) || m.includes(medLower))) {
+                            // Both the allergy and new med are in the same class
+                            if (!(medLower.includes(allergyLower) || allergyLower.includes(medLower))) {
+                                // Only flag if not already caught by direct match
+                                return {
+                                    allergy: allergy.name,
+                                    reason: `"${medName}" and "${allergy.name}" are both in the ${className} drug class. Cross-reactivity is possible.`
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Try RxNorm class lookup for drugs not in our local map
+            try {
+                const rxcui = await getRxCUI(medName);
+                if (rxcui) {
+                    const classUrl = `https://rxnav.nlm.nih.gov/REST/rxclass/class/byRxcui.json?rxcui=${rxcui}&relaSource=MEDRT&relas=may_treat,has_PE`;
+                    const response = await fetch(classUrl);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.rxclassDrugInfoList && data.rxclassDrugInfoList.rxclassDrugInfo) {
+                            const classes = data.rxclassDrugInfoList.rxclassDrugInfo.map(
+                                info => info.rxclassMinConceptItem.className.toLowerCase()
+                            );
+                            for (const allergy of allergies) {
+                                const allergyLower = allergy.name.toLowerCase();
+                                for (const cls of classes) {
+                                    if (cls.includes(allergyLower) || allergyLower.includes(cls)) {
+                                        return {
+                                            allergy: allergy.name,
+                                            reason: `"${medName}" is classified under "${cls}", which may be related to your allergy to "${allergy.name}".`
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('RxNorm class check error:', e);
+                // Non-blocking — continue without online check
+            }
+
+            return null;
+        }
+
+        function checkAllergyConflicts(medications, allergies) {
+            const conflicts = [];
+            const seen = new Set(); // prevent duplicates
+
+            medications.forEach(med => {
+                const medLower = med.name.toLowerCase();
+                allergies.forEach(allergy => {
+                    const allergyLower = allergy.name.toLowerCase();
+                    const key = med.name + '|' + allergy.name;
+                    if (seen.has(key)) return;
+
+                    // Direct name match
+                    if (medLower.includes(allergyLower) || allergyLower.includes(medLower)) {
+                        seen.add(key);
+                        conflicts.push({
+                            medication: med.name,
+                            allergy: allergy.name,
+                            reason: `Name match with "${allergy.name}"`
+                        });
+                        return;
+                    }
+
+                    // Drug class cross-reference
+                    for (const [className, members] of Object.entries(DRUG_CLASS_MAP)) {
+                        // Allergy is a class name, med is a member
+                        if (allergyLower.includes(className) || className.includes(allergyLower)) {
+                            if (members.some(m => medLower.includes(m) || m.includes(medLower))) {
+                                seen.add(key);
+                                conflicts.push({
+                                    medication: med.name,
+                                    allergy: allergy.name,
+                                    reason: `${med.name} is a ${className}-class drug`
+                                });
+                                return;
+                            }
+                        }
+
+                        // Both allergy and med are members of the same class
+                        const allergyInClass = members.some(m => allergyLower.includes(m) || m.includes(allergyLower));
+                        const medInClass = members.some(m => medLower.includes(m) || m.includes(medLower));
+                        if (allergyInClass && medInClass) {
+                            seen.add(key);
+                            conflicts.push({
+                                medication: med.name,
+                                allergy: allergy.name,
+                                reason: `Both are in the ${className} class — cross-reactivity possible`
+                            });
+                            return;
+                        }
+                    }
+                });
+            });
+
+            return conflicts;
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        let _shareText = '';
+
+        function exportMedList() {
+            const patient = patients[currentPatient];
+            const medications = patient.medications || [];
+            const allergies = patient.allergies || [];
+
+            if (medications.length === 0) {
+                showToast('No medications to share');
+                return;
+            }
+
+            // Build text
+            let text = `MEDICATION LIST\n`;
+            text += `Patient: ${patient.name}\n`;
+            text += `Date: ${new Date().toLocaleDateString()}\n\n`;
+
+            if (allergies.length > 0) {
+                text += `ALLERGIES:\n`;
+                allergies.forEach(a => { text += `  - ${a.name}\n`; });
+                text += `\n`;
+            }
+
+            text += `CURRENT MEDICATIONS:\n${'='.repeat(40)}\n\n`;
+
+            medications.forEach((med, i) => {
+                text += `${i + 1}. ${med.name}\n`;
+                text += `   Dosage: ${med.dosage}\n`;
+                text += `   Frequency: ${med.frequency}\n`;
+                if (med.doctor) text += `   Doctor: ${med.doctor}\n`;
+                if (med.reason) text += `   For: ${med.reason}\n`;
+                if (med.refillDate) {
+                    const d = Math.ceil((new Date(med.refillDate) - new Date()) / 86400000);
+                    text += `   Next Refill: ${new Date(med.refillDate).toLocaleDateString()}`;
+                    if (d <= 7 && d >= 0) text += ` (in ${d} days)`;
+                    text += `\n`;
+                }
+                text += `\n`;
+            });
+
+            text += `Generated by MedGuardian\n`;
+            _shareText = text;
+
+            document.getElementById('shareModal').classList.add('active');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.remove('active');
+        }
+
+        function doShare(method) {
+            const patient = patients[currentPatient];
+            closeShareModal();
+            switch(method) {
+                case 'sms':
+                    window.location.href = `sms:?body=${encodeURIComponent(_shareText)}`;
+                    break;
+                case 'email':
+                    window.location.href = `mailto:?subject=Medication List - ${patient.name}&body=${encodeURIComponent(_shareText)}`;
+                    break;
+                case 'copy':
+                    navigator.clipboard.writeText(_shareText).then(() => showToast('Copied to clipboard'));
+                    break;
+                case 'download':
+                    const blob = new Blob([_shareText], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `meds-${patient.name.replace(/\s/g, '-')}-${new Date().toISOString().split('T')[0]}.txt`;
+                    link.click();
+                    showToast('File downloaded');
+                    break;
+            }
+        }
+
+        function checkRefillReminders() {
+            const medications = patients[currentPatient].medications || [];
+            const upcoming = [];
+            const overdue = [];
+            
+            medications.forEach(med => {
+                if (med.refillDate) {
+                    const daysUntil = Math.ceil((new Date(med.refillDate) - new Date()) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysUntil < 0) {
+                        overdue.push({...med, daysOverdue: Math.abs(daysUntil)});
+                    } else if (daysUntil <= 7) {
+                        upcoming.push({...med, daysUntil});
+                    }
+                }
+            });
+            
+            return { upcoming, overdue };
+        }
+
+        function renderSchedule(medications) {
+            const scheduleContainer = document.getElementById('medicationSchedule');
+            
+            if (medications.length === 0) {
+                scheduleContainer.innerHTML = '';
+                return;
+            }
+            
+            // Group medications by time
+            const schedule = {
+                morning: medications.filter(m => {
+                    const freq = m.frequency.toLowerCase();
+                    return freq.includes('once') || freq.includes('daily') || freq.includes('morning');
+                }),
+                afternoon: medications.filter(m => m.frequency.toLowerCase().includes('afternoon')),
+                evening: medications.filter(m => {
+                    const freq = m.frequency.toLowerCase();
+                    return freq.includes('twice') || freq.includes('evening');
+                }),
+                bedtime: medications.filter(m => m.frequency.toLowerCase().includes('bedtime') || m.frequency.toLowerCase().includes('night')),
+                asneeded: medications.filter(m => m.frequency.toLowerCase().includes('as needed'))
+            };
+            
+            let html = '<div style="background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 15px; margin-bottom: 20px;">';
+            html += '<h3 style="margin: 0 0 15px 0; font-size: 16px; color: #2d3748;">📅 Daily Medication Schedule</h3>';
+            
+            const times = [
+                { key: 'morning', icon: '🌅', label: 'Morning (8am)', meds: schedule.morning },
+                { key: 'afternoon', icon: '☀️', label: 'Afternoon (2pm)', meds: schedule.afternoon },
+                { key: 'evening', icon: '🌆', label: 'Evening (6pm)', meds: schedule.evening },
+                { key: 'bedtime', icon: '🌙', label: 'Bedtime (10pm)', meds: schedule.bedtime },
+                { key: 'asneeded', icon: '💊', label: 'As Needed', meds: schedule.asneeded }
+            ];
+            
+            times.forEach(time => {
+                if (time.meds.length > 0) {
+                    html += `<div style="margin-bottom: 12px; padding: 10px; background: #f7fafc; border-radius: 8px;">`;
+                    html += `<div style="font-weight: 600; color: #4a5568; margin-bottom: 6px;">${time.icon} ${time.label}</div>`;
+                    time.meds.forEach(med => {
+                        html += `<div style="padding: 4px 0; color: #2d3748;">• ${med.name} - ${med.dosage}</div>`;
+                    });
+                    html += `</div>`;
+                }
+            });
+            
+            html += '</div>';
+            scheduleContainer.innerHTML = html;
+        }
+
+        function saveData() {
+            localStorage.setItem('medguardian_patients', JSON.stringify(patients));
+            localStorage.setItem('medguardian_current', currentPatient);
+            localStorage.setItem('medguardian_rxnorm_cache', JSON.stringify(rxnormCache));
+        }
+
+        function loadData() {
+            const savedPatients = localStorage.getItem('medguardian_patients');
+            const savedCurrent = localStorage.getItem('medguardian_current');
+            const savedCache = localStorage.getItem('medguardian_rxnorm_cache');
+
+            if (savedPatients) {
+                patients = JSON.parse(savedPatients);
+                // Ensure all patients have allergies array (for backward compatibility)
+                Object.keys(patients).forEach(key => {
+                    if (!patients[key].allergies) {
+                        patients[key].allergies = [];
+                    }
+                });
+            }
+            if (savedCurrent) {
+                currentPatient = savedCurrent;
+            }
+            if (savedCache) {
+                rxnormCache = JSON.parse(savedCache);
+            }
+
+            updatePatientSelector();
+        }
+    </script>
+</body>
+</html>
