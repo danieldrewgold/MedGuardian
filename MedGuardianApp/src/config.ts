@@ -22,8 +22,8 @@ function getApiUrl(): string {
     }
   }
 
-  // Fallback — update this for production deployment
-  return 'http://localhost:3000';
+  // Production server on Railway
+  return 'https://medguardian-production.up.railway.app';
 }
 
 export const API_URL = getApiUrl();
