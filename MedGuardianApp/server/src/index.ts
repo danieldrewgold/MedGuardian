@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 import path from 'path';
-dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
+// Only load .env in development — in production (Railway), env vars are injected
+if (!process.env.RAILWAY_ENVIRONMENT) {
+  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+}
 
 import express from 'express';
 import cors from 'cors';
@@ -172,6 +175,6 @@ RULES:
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`MedGuardian server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`MedGuardian server running on 0.0.0.0:${PORT}`);
 });

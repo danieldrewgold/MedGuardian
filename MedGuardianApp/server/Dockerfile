@@ -11,5 +11,6 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
-EXPOSE 3000
+ENV PORT=3000
+EXPOSE ${PORT}
 CMD ["node", "dist/index.js"]
