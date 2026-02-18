@@ -1,4 +1,5 @@
 import { CriticalInteraction, Medication, Interaction, Allergy, AllergyConflict, RefillStatus } from '../types';
+import { resolveGenericName } from './rxnorm';
 
 // ─── Expanded offline interaction database (45+ entries) ─────────────────────
 // Sources: ONC High-Priority DDI list, FDA drug labels, clinical references.
@@ -358,8 +359,9 @@ export async function checkInteractions(medications: Medication[]): Promise<Inte
   // 1. Check local offline database first (instant, no network needed)
   for (let i = 0; i < medications.length; i++) {
     for (let j = i + 1; j < medications.length; j++) {
-      const name1 = medications[i].name.toLowerCase();
-      const name2 = medications[j].name.toLowerCase();
+      // Resolve brand names to generics (e.g., "Tylenol" → "acetaminophen")
+      const name1 = resolveGenericName(medications[i].name).toLowerCase();
+      const name2 = resolveGenericName(medications[j].name).toLowerCase();
 
       for (const interaction of CRITICAL_INTERACTIONS) {
         const match1 = name1.includes(interaction.drug1) && name2.includes(interaction.drug2);
@@ -385,14 +387,16 @@ export async function checkInteractions(medications: Medication[]): Promise<Inte
   // 2. Check OpenFDA labels for additional interactions not in offline DB
   try {
     for (let i = 0; i < medications.length; i++) {
-      const mentionedDrugs = await getFDAInteractionDrugs(medications[i].name);
+      // Use generic name for FDA lookup (brand names don't work well)
+      const genericI = resolveGenericName(medications[i].name);
+      const mentionedDrugs = await getFDAInteractionDrugs(genericI);
 
       for (let j = 0; j < medications.length; j++) {
         if (i === j) continue;
         const key = pairKey(medications[i].name, medications[j].name);
         if (foundPairs.has(key)) continue;
 
-        const otherName = medications[j].name.toLowerCase();
+        const otherName = resolveGenericName(medications[j].name).toLowerCase();
         if (mentionedDrugs.some((d) => otherName.includes(d) || d.includes(otherName))) {
           foundPairs.add(key);
           interactions.push({
@@ -478,8 +482,9 @@ export function checkAllergyConflicts(medications: Medication[], allergies: Alle
 
   for (const med of medications) {
     for (const allergy of allergies) {
-      const medName = med.name.toLowerCase();
-      const allergyName = allergy.name.toLowerCase();
+      // Resolve brand names to generics for matching
+      const medName = resolveGenericName(med.name).toLowerCase();
+      const allergyName = resolveGenericName(allergy.name).toLowerCase();
       const key = `${medName}|||${allergyName}`;
 
       // 1. Direct name match (existing behavior)
@@ -513,9 +518,9 @@ export function checkAllergyConflicts(medications: Medication[], allergies: Alle
   // 3. Check if allergen drugs have known interactions with current meds
   //    e.g., allergic to amoxicillin → amoxicillin interacts with warfarin → flag it
   for (const allergy of allergies) {
-    const allergyLower = allergy.name.toLowerCase();
+    const allergyLower = resolveGenericName(allergy.name).toLowerCase();
     for (const med of medications) {
-      const medLower = med.name.toLowerCase();
+      const medLower = resolveGenericName(med.name).toLowerCase();
       const key = `interaction_${medLower}|||${allergyLower}`;
       if (found.has(key)) continue;
 
