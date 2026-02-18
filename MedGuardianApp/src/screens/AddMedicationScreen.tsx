@@ -662,6 +662,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 14,
     backgroundColor: '#fff',
+    color: '#2d3748',
   },
   medNameInput: {
     borderWidth: 2,
@@ -671,6 +672,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: '#2d3748',
   },
   freqRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   freqChip: {

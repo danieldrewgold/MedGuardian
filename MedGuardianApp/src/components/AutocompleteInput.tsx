@@ -220,6 +220,7 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 14,
     backgroundColor: '#fff',
+    color: '#2d3748',
   },
   submitBtn: {
     paddingVertical: 10,

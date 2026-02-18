@@ -1130,6 +1130,7 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 14,
     backgroundColor: '#fff',
+    color: '#2d3748',
   },
   newPatientSave: {
     backgroundColor: '#667eea',
@@ -1159,6 +1160,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     fontSize: 14,
+    color: '#2d3748',
   },
   allergyInputSave: {
     backgroundColor: '#fc8181',
@@ -1267,6 +1269,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 14,
     backgroundColor: '#fff',
+    color: '#2d3748',
   },
   interactionCheckBtn: {
     backgroundColor: '#667eea',
@@ -1362,6 +1365,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
     backgroundColor: '#f7fafc',
     marginTop: 6,
+    color: '#2d3748',
   },
   notesPreview: {
     fontSize: 13,
@@ -1435,6 +1439,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 80,
     backgroundColor: '#f7fafc',
+    color: '#2d3748',
   },
   visitNoteInputActions: {
     flexDirection: 'row',
