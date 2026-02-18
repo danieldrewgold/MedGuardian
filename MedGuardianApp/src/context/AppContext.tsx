@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Patients, Medication, Allergy, Interaction, AllergyConflict, RefillStatus, VisitNote } from '../types';
+import { Patients, Medication, MedStatus, Allergy, Interaction, AllergyConflict, RefillStatus, VisitNote } from '../types';
 import { checkInteractions, checkAllergyConflicts, checkRefillReminders } from '../services/interactions';
 
 interface AppState {
@@ -23,6 +23,7 @@ interface AppContextType extends AppState {
   addAllergy: (name: string) => void;
   deleteAllergy: (id: number) => void;
   updatePatientNotes: (notes: string) => void;
+  updateMedStatus: (id: number, status: MedStatus) => void;
   addVisitNote: (text: string) => void;
   deleteVisitNote: (id: number) => void;
   getRecentMeds: () => string[];
@@ -192,6 +193,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [patients, currentPatient, savePatients]
   );
 
+  const updateMedStatus = useCallback(
+    (id: number, status: MedStatus) => {
+      const newPatients = { ...patients };
+      newPatients[currentPatient] = {
+        ...newPatients[currentPatient],
+        medications: newPatients[currentPatient].medications.map((m) =>
+          m.id === id ? { ...m, status, statusUpdatedAt: new Date().toISOString() } : m
+        ),
+      };
+      savePatients(newPatients);
+    },
+    [patients, currentPatient, savePatients]
+  );
+
   const addAllergy = useCallback(
     (name: string) => {
       const allergy: Allergy = {
@@ -300,6 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addMedication,
         updateMedication,
         deleteMedication,
+        updateMedStatus,
         addAllergy,
         deleteAllergy,
         updatePatientNotes,

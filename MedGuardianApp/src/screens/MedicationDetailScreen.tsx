@@ -7,9 +7,17 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { Medication } from '../types';
+import { Medication, MedStatus } from '../types';
 import { fetchDrugLabel, DrugLabelInfo } from '../services/openfda';
 import { getSideEffects, SideEffectProfile } from '../services/sideEffects';
+import { useApp } from '../context/AppContext';
+
+const STATUS_STEPS: { key: MedStatus; label: string }[] = [
+  { key: 'prescribed', label: 'Prescribed' },
+  { key: 'sent_to_pharmacy', label: 'At Pharmacy' },
+  { key: 'picked_up', label: 'Picked Up' },
+  { key: 'active', label: 'Active' },
+];
 
 interface Section {
   title: string;
@@ -27,10 +35,19 @@ const SECTIONS: Section[] = [
 
 export default function MedicationDetailScreen({ route, navigation }: any) {
   const medication: Medication = route.params.medication;
+  const { updateMedStatus } = useApp();
   const [labelInfo, setLabelInfo] = useState<DrugLabelInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [showAllSideEffects, setShowAllSideEffects] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<MedStatus>(medication.status || 'active');
+
+  const handleStatusChange = (status: MedStatus) => {
+    setCurrentStatus(status);
+    updateMedStatus(medication.id, status);
+  };
+
+  const currentStepIndex = STATUS_STEPS.findIndex((s) => s.key === currentStatus);
 
   useEffect(() => {
     (async () => {
@@ -114,6 +131,55 @@ export default function MedicationDetailScreen({ route, navigation }: any) {
         >
           <Text style={styles.editBtnText}>Edit Medication</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Status Tracker */}
+      <View style={styles.statusCard}>
+        <Text style={styles.statusTitle}>Medication Status</Text>
+        <View style={styles.statusTrack}>
+          {STATUS_STEPS.map((step, index) => {
+            const isActive = index <= currentStepIndex;
+            const isCurrent = step.key === currentStatus;
+            return (
+              <React.Fragment key={step.key}>
+                {index > 0 && (
+                  <View style={[styles.statusLine, isActive && styles.statusLineActive]} />
+                )}
+                <TouchableOpacity
+                  style={[
+                    styles.statusStep,
+                    isActive && styles.statusStepActive,
+                    isCurrent && styles.statusStepCurrent,
+                  ]}
+                  onPress={() => handleStatusChange(step.key)}
+                >
+                  <View style={[styles.statusCircle, isActive && styles.statusCircleActive]}>
+                    {isActive && <Text style={styles.statusCheck}>{isCurrent ? '\u2713' : '\u2022'}</Text>}
+                  </View>
+                  <Text style={[styles.statusLabel, isActive && styles.statusLabelActive]}>{step.label}</Text>
+                </TouchableOpacity>
+              </React.Fragment>
+            );
+          })}
+        </View>
+        {currentStatus === 'discontinued' ? (
+          <View style={styles.discontinuedBanner}>
+            <Text style={styles.discontinuedText}>This medication has been discontinued</Text>
+          </View>
+        ) : null}
+        <TouchableOpacity
+          style={styles.discontinueBtn}
+          onPress={() => handleStatusChange(currentStatus === 'discontinued' ? 'active' : 'discontinued')}
+        >
+          <Text style={styles.discontinueBtnText}>
+            {currentStatus === 'discontinued' ? 'Reactivate Medication' : 'Mark as Discontinued'}
+          </Text>
+        </TouchableOpacity>
+        {medication.statusUpdatedAt && (
+          <Text style={styles.statusUpdatedAt}>
+            Last updated {new Date(medication.statusUpdatedAt).toLocaleDateString()}
+          </Text>
+        )}
       </View>
 
       {/* Side Effects Section */}
@@ -328,6 +394,96 @@ const styles = StyleSheet.create({
     borderTopColor: '#f0f0f0',
   },
   accordionText: { fontSize: 14, color: '#4a5568', lineHeight: 22 },
+
+  // ── Status Tracker ──
+  statusCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2d3748',
+    marginBottom: 16,
+  },
+  statusTrack: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  statusLine: {
+    height: 2,
+    flex: 1,
+    backgroundColor: '#e2e8f0',
+    marginTop: 14,
+  },
+  statusLineActive: {
+    backgroundColor: '#0d9488',
+  },
+  statusStep: {
+    alignItems: 'center',
+    width: 70,
+  },
+  statusStepActive: {},
+  statusStepCurrent: {},
+  statusCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  statusCircleActive: {
+    backgroundColor: '#0d9488',
+  },
+  statusCheck: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statusLabel: {
+    fontSize: 11,
+    color: '#a0aec0',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  statusLabelActive: {
+    color: '#0d9488',
+  },
+  discontinuedBanner: {
+    backgroundColor: '#fff5f5',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  discontinuedText: {
+    color: '#c53030',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  discontinueBtn: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  discontinueBtnText: {
+    fontSize: 13,
+    color: '#a0aec0',
+    fontWeight: '500',
+  },
+  statusUpdatedAt: {
+    fontSize: 11,
+    color: '#cbd5e0',
+    textAlign: 'center',
+    marginTop: 4,
+  },
 
   // ── Side Effects ──
   sideEffectsCard: {

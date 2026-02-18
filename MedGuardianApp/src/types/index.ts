@@ -1,3 +1,5 @@
+export type MedStatus = 'prescribed' | 'sent_to_pharmacy' | 'picked_up' | 'active' | 'discontinued';
+
 export interface Medication {
   id: number;
   name: string;
@@ -8,6 +10,8 @@ export interface Medication {
   refillDate: string | null;
   addedDate: string;
   schedule: string;
+  status?: MedStatus;
+  statusUpdatedAt?: string;
 }
 
 export interface Allergy {

@@ -1,7 +1,15 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Medication, Interaction, AllergyConflict } from '../types';
+import { Medication, MedStatus, Interaction, AllergyConflict } from '../types';
 import { getSideEffectsFromDB } from '../services/sideEffects';
+
+const STATUS_CONFIG: Record<MedStatus, { label: string; color: string; bg: string }> = {
+  prescribed: { label: 'Prescribed', color: '#667eea', bg: '#eef2ff' },
+  sent_to_pharmacy: { label: 'At Pharmacy', color: '#d69e2e', bg: '#fefce8' },
+  picked_up: { label: 'Picked Up', color: '#38a169', bg: '#f0fff4' },
+  active: { label: 'Active', color: '#0d9488', bg: '#f0fdfa' },
+  discontinued: { label: 'Discontinued', color: '#a0aec0', bg: '#f7fafc' },
+};
 
 interface Props {
   medication: Medication;
@@ -51,6 +59,15 @@ export default function MedicationCard({ medication, interactions, allergyConfli
           <Text style={styles.deleteBtnText}>Remove</Text>
         </TouchableOpacity>
       </View>
+
+      {medication.status && medication.status !== 'active' && (
+        <View style={[styles.statusRow, { backgroundColor: STATUS_CONFIG[medication.status].bg }]}>
+          <View style={[styles.statusDot, { backgroundColor: STATUS_CONFIG[medication.status].color }]} />
+          <Text style={[styles.statusText, { color: STATUS_CONFIG[medication.status].color }]}>
+            {STATUS_CONFIG[medication.status].label}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.info}>
         {medication.doctor ? <Text style={styles.infoRow}>Dr. {medication.doctor}</Text> : null}
@@ -122,6 +139,17 @@ const styles = StyleSheet.create({
   dosage: { fontSize: 14, color: '#718096', marginTop: 2 },
   deleteBtn: { backgroundColor: '#fc8181', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
   deleteBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  statusText: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   info: {},
   infoRow: { fontSize: 13, color: '#4a5568', lineHeight: 22 },
   overdue: { color: '#c53030', fontWeight: '600' },
