@@ -8,6 +8,20 @@ export interface ScanResult {
   refillDate: string;
 }
 
+export interface PillIdResult {
+  name: string;
+  brandName: string;
+  dosage: string;
+  imprint: string;
+  shape: string;
+  color: string;
+  scoring: string;
+  confidence: 'high' | 'medium' | 'low';
+  description: string;
+  fdaVerified?: boolean;
+  manufacturer?: string;
+}
+
 /**
  * Parse the server response into validated ScanResult array.
  */
@@ -70,4 +84,27 @@ export async function scanBase64Image(
 
   const data: any = await response.json();
   return parseResponse(data);
+}
+
+/**
+ * Identifies loose pills from a base64-encoded image.
+ * Uses visual analysis to identify pills by imprint, shape, and color.
+ */
+export async function identifyPills(base64: string): Promise<PillIdResult[]> {
+  const response = await fetch(`${API_URL}/api/pill-id`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64 }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Server error (${response.status})` }));
+    throw new Error(errorData.error || `Server error (${response.status})`);
+  }
+
+  const data: any = await response.json();
+  if (data.pills && Array.isArray(data.pills)) {
+    return data.pills.filter((p: any) => p.name || p.imprint);
+  }
+  return [];
 }

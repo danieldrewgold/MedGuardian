@@ -36,20 +36,51 @@ export default function AlertsList() {
         </View>
       ))}
 
-      {allergyConflicts.map((conflict, i) => (
-        <View key={`allergy-${i}`} style={[styles.alert, styles.critical]}>
-          <Text style={styles.title}>ALLERGY INFORMATION: {conflict.medication}</Text>
-          <Text style={styles.text}>Patient has documented allergy to: {conflict.allergy}</Text>
-          <Text style={styles.text}>
-            Taking medications you're allergic to may cause serious reactions. Consult your healthcare
-            provider immediately if this medication was prescribed to you.
-          </Text>
-          <Text style={styles.footnote}>
-            This is an informational alert based on your allergy list. Always verify medications with your
-            healthcare provider.
-          </Text>
-        </View>
-      ))}
+      {allergyConflicts.map((conflict, i) => {
+        const isInteraction = conflict.allergy.includes('(known interaction:');
+        const isCrossReactivity = conflict.allergy.includes('(cross-reactivity)') || conflict.allergy.includes('(same drug class)');
+        const isDirect = !isInteraction && !isCrossReactivity;
+
+        return (
+          <View key={`allergy-${i}`} style={[styles.alert, styles.critical]}>
+            {isDirect ? (
+              <>
+                <Text style={styles.title}>ALLERGY ALERT: {conflict.medication}</Text>
+                <Text style={styles.text}>Patient has documented allergy to: {conflict.allergy}</Text>
+                <Text style={styles.text}>
+                  Taking medications you're allergic to may cause serious reactions. Consult your healthcare
+                  provider immediately if this medication was prescribed to you.
+                </Text>
+              </>
+            ) : isCrossReactivity ? (
+              <>
+                <Text style={styles.title}>ALLERGY ALERT (RELATED DRUG): {conflict.medication}</Text>
+                <Text style={styles.text}>Patient has documented allergy to: {conflict.allergy}</Text>
+                <Text style={styles.text}>
+                  {conflict.medication} belongs to the same drug class or a cross-reactive class. Discuss with
+                  your healthcare provider before taking this medication.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.title}>ALLERGY-DRUG INTERACTION: {conflict.medication}</Text>
+                <Text style={styles.text}>Patient is allergic to: {conflict.allergy.split(' (known interaction:')[0]}</Text>
+                <Text style={styles.text}>
+                  {conflict.allergy.match(/\(known interaction: (.+)\)/)?.[1] || 'Known interaction between this allergy and current medication.'}
+                </Text>
+                <Text style={styles.text}>
+                  Even though the patient is not taking {conflict.allergy.split(' (known interaction:')[0]}, this allergy may be clinically relevant
+                  to {conflict.medication}. Discuss with your healthcare provider.
+                </Text>
+              </>
+            )}
+            <Text style={styles.footnote}>
+              This is an informational alert based on your allergy list. Always verify medications with your
+              healthcare provider.
+            </Text>
+          </View>
+        );
+      })}
 
       {interactions.map((interaction, i) => (
         <View

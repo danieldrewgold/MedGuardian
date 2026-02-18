@@ -175,6 +175,176 @@ RULES:
   }
 });
 
+// ─── Pill Visual Identification Endpoint ────────────────────────────────────
+
+const pillIdLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  message: { error: 'Too many pill ID requests. Please try again in a minute.' },
+});
+
+app.post('/api/pill-id', pillIdLimiter, async (req, res) => {
+  const { image } = req.body;
+
+  if (!image || typeof image !== 'string') {
+    res.status(400).json({ error: 'Missing "image" field (base64 string)' });
+    return;
+  }
+
+  const prompt = `You are a pill identification assistant. Look at this image of pills/tablets/capsules.
+
+For EACH distinct pill visible in the image, analyze:
+1. SHAPE: round, oval, oblong, capsule, diamond, square, rectangle, triangle, other
+2. COLOR: the primary color(s) — white, yellow, blue, pink, red, orange, green, brown, tan, peach, purple, gray, etc. Note if two-toned.
+3. IMPRINT: any text, numbers, letters, or symbols stamped/printed on the pill. Check BOTH sides if visible. Common formats: "IP 204", "M523", "TEVA", "G 31", "L484", "watson 853".
+4. SCORING: is there a score line (dividing line) on the pill?
+5. COATING: film-coated, sugar-coated, uncoated, enteric-coated, gel-cap
+6. SIZE: estimate approximate size (small <7mm, medium 7-12mm, large >12mm)
+
+Then IDENTIFY the medication:
+- Use the imprint code as the PRIMARY identifier — most US prescription pills have a unique imprint
+- Cross-reference shape + color + imprint to identify the exact medication
+- Provide the generic drug name, brand name if known, and strength/dosage
+
+For each pill, respond with this JSON format. Return ONLY a JSON array:
+[{
+  "name": "generic drug name",
+  "brandName": "brand name or empty string",
+  "dosage": "strength e.g. 10mg",
+  "imprint": "text on pill e.g. IP 204",
+  "shape": "round/oval/oblong/capsule/etc",
+  "color": "white/blue/etc",
+  "scoring": "scored/unscored",
+  "confidence": "high/medium/low",
+  "description": "brief 1-sentence identification note"
+}]
+
+IMPORTANT RULES:
+- If you can clearly read an imprint code, identify the pill based on that — this is the most reliable method
+- If no imprint is visible or the pill is hard to identify, set confidence to "low" and provide your best guess with the description explaining uncertainty
+- Return empty array [] if no pills are visible or the image is not of pills
+- Do NOT guess wildly — if truly unidentifiable, say so in description with confidence "low"
+- Many OTC pills (like acetaminophen, ibuprofen) have well-known imprints: L484 = acetaminophen 500mg, I-2 = ibuprofen 200mg, etc.
+- If multiple identical pills are visible, return ONE entry (not duplicates)
+
+Respond with ONLY the JSON array, no markdown, no other text.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY!,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: image,
+                },
+              },
+              {
+                type: 'text',
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Anthropic API error (${response.status}):`, errorText.substring(0, 300));
+      res.status(502).json({ error: 'Failed to analyze pill image. Please try again.' });
+      return;
+    }
+
+    const data: any = await response.json();
+    let extractedText = '';
+
+    if (data.content && Array.isArray(data.content)) {
+      for (const block of data.content) {
+        if (block.type === 'text' && block.text) {
+          extractedText += block.text;
+        }
+      }
+    }
+
+    if (!extractedText) {
+      res.status(502).json({ error: 'No text in API response' });
+      return;
+    }
+
+    const cleanText = extractedText.trim().replace(/```json\s*/g, '').replace(/```\s*/g, '');
+
+    // Parse JSON array
+    const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
+    if (arrayMatch) {
+      const parsed = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(parsed)) {
+        const pills = parsed.filter((item: any) => item.name || item.imprint);
+
+        // For each identified pill, try to cross-reference with FDA
+        const enrichedPills = await Promise.all(
+          pills.map(async (pill: any) => {
+            if (pill.name) {
+              try {
+                const fdaUrl = `https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${encodeURIComponent(pill.name)}"&limit=1`;
+                const fdaResponse = await fetch(fdaUrl);
+                if (fdaResponse.ok) {
+                  const fdaData: any = await fdaResponse.json();
+                  const label = fdaData.results?.[0];
+                  if (label) {
+                    const openfda = label.openfda || {};
+                    pill.fdaVerified = true;
+                    if (!pill.brandName && openfda.brand_name?.[0]) {
+                      pill.brandName = openfda.brand_name[0];
+                    }
+                    if (openfda.manufacturer_name?.[0]) {
+                      pill.manufacturer = openfda.manufacturer_name[0];
+                    }
+                  }
+                }
+              } catch {
+                // FDA enrichment is best-effort
+              }
+            }
+            return pill;
+          })
+        );
+
+        res.json({ pills: enrichedPills });
+        return;
+      }
+    }
+
+    // Fallback: single object
+    const objMatch = cleanText.match(/\{[^{}]*\}/);
+    if (objMatch) {
+      const parsed = JSON.parse(objMatch[0]);
+      if (parsed.name || parsed.imprint) {
+        res.json({ pills: [parsed] });
+        return;
+      }
+    }
+
+    res.json({ pills: [], message: 'No pills could be identified in the image' });
+  } catch (error: any) {
+    console.error('Pill ID error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`MedGuardian server running on 0.0.0.0:${PORT}`);
 });

@@ -15,6 +15,7 @@ export const CRITICAL_INTERACTIONS: CriticalInteraction[] = [
   { drug1: 'warfarin', drug2: 'omeprazole', severity: 'moderate', description: 'Omeprazole may affect warfarin metabolism.', info: 'Monitor INR when starting or stopping omeprazole.' },
   { drug1: 'warfarin', drug2: 'clopidogrel', severity: 'major', description: 'Combining anticoagulant with antiplatelet greatly increases bleeding risk.', info: 'This combination requires close monitoring. Report any unusual bleeding.' },
   { drug1: 'warfarin', drug2: 'erythromycin', severity: 'major', description: 'Erythromycin may increase warfarin levels and bleeding risk.', info: 'INR should be monitored closely during antibiotic treatment.' },
+  { drug1: 'warfarin', drug2: 'amoxicillin', severity: 'moderate', description: 'Amoxicillin may increase warfarin effect and bleeding risk.', info: 'INR should be monitored during and shortly after antibiotic treatment. Report any unusual bleeding.' },
   { drug1: 'warfarin', drug2: 'sulfamethoxazole', severity: 'major', description: 'Sulfamethoxazole (Bactrim) may significantly increase warfarin effect.', info: 'INR monitoring is critical. Dose adjustment may be needed.' },
   { drug1: 'warfarin', drug2: 'trimethoprim', severity: 'major', description: 'Trimethoprim (Bactrim) may significantly increase warfarin effect.', info: 'INR monitoring is critical. Dose adjustment may be needed.' },
   { drug1: 'warfarin', drug2: 'phenytoin', severity: 'major', description: 'Complex interaction — each drug may alter the other\'s levels.', info: 'Both INR and phenytoin levels should be monitored closely.' },
@@ -412,19 +413,128 @@ export async function checkInteractions(medications: Medication[]): Promise<Inte
   return interactions;
 }
 
+// ─── Drug class cross-reactivity mapping ────────────────────────────────────
+// If patient is allergic to one member of a drug class, flag related drugs too.
+
+const DRUG_CLASS_FAMILIES: Record<string, string[]> = {
+  penicillin: ['penicillin', 'amoxicillin', 'ampicillin', 'augmentin', 'amoxicillin/clavulanate', 'piperacillin', 'nafcillin', 'oxacillin', 'dicloxacillin'],
+  cephalosporin: ['cephalexin', 'cefazolin', 'ceftriaxone', 'cefdinir', 'cefuroxime', 'cefepime', 'ceftazidime', 'cefpodoxime'],
+  sulfa: ['sulfamethoxazole', 'trimethoprim/sulfamethoxazole', 'bactrim', 'sulfasalazine'],
+  fluoroquinolone: ['ciprofloxacin', 'levofloxacin', 'moxifloxacin', 'ofloxacin'],
+  nsaid: ['ibuprofen', 'naproxen', 'aspirin', 'celecoxib', 'meloxicam', 'diclofenac', 'indomethacin', 'ketorolac'],
+  statin: ['atorvastatin', 'simvastatin', 'rosuvastatin', 'lovastatin', 'pravastatin', 'fluvastatin'],
+  ace_inhibitor: ['lisinopril', 'enalapril', 'ramipril', 'benazepril', 'captopril', 'quinapril', 'fosinopril'],
+  arb: ['losartan', 'valsartan', 'irbesartan', 'olmesartan', 'candesartan', 'telmisartan'],
+  opioid: ['oxycodone', 'hydrocodone', 'morphine', 'codeine', 'tramadol', 'fentanyl', 'methadone', 'hydromorphone'],
+  benzodiazepine: ['alprazolam', 'diazepam', 'lorazepam', 'clonazepam', 'midazolam', 'temazepam'],
+  ssri: ['sertraline', 'fluoxetine', 'paroxetine', 'citalopram', 'escitalopram'],
+};
+
+// Note: penicillin allergy has ~1-2% cross-reactivity with cephalosporins
+const CROSS_REACTIVE_CLASSES: [string, string][] = [
+  ['penicillin', 'cephalosporin'],
+];
+
+function getDrugFamily(drugName: string): string | null {
+  const lower = drugName.toLowerCase();
+  for (const [family, members] of Object.entries(DRUG_CLASS_FAMILIES)) {
+    if (members.some((m) => lower.includes(m) || m.includes(lower))) {
+      return family;
+    }
+  }
+  return null;
+}
+
+function getRelatedDrugs(drugName: string): string[] {
+  const family = getDrugFamily(drugName);
+  if (!family) return [];
+
+  const related: string[] = [];
+
+  // Same-family drugs
+  for (const member of DRUG_CLASS_FAMILIES[family]) {
+    if (member !== drugName.toLowerCase()) {
+      related.push(member);
+    }
+  }
+
+  // Cross-reactive class drugs
+  for (const [classA, classB] of CROSS_REACTIVE_CLASSES) {
+    if (family === classA) {
+      related.push(...DRUG_CLASS_FAMILIES[classB]);
+    } else if (family === classB) {
+      related.push(...DRUG_CLASS_FAMILIES[classA]);
+    }
+  }
+
+  return related;
+}
+
 // ─── Allergy conflict checking ───────────────────────────────────────────────
 
 export function checkAllergyConflicts(medications: Medication[], allergies: Allergy[]): AllergyConflict[] {
   const conflicts: AllergyConflict[] = [];
+  const found = new Set<string>();
+
   for (const med of medications) {
     for (const allergy of allergies) {
       const medName = med.name.toLowerCase();
       const allergyName = allergy.name.toLowerCase();
+      const key = `${medName}|||${allergyName}`;
+
+      // 1. Direct name match (existing behavior)
       if (medName.includes(allergyName) || allergyName.includes(medName)) {
-        conflicts.push({ medication: med.name, allergy: allergy.name });
+        if (!found.has(key)) {
+          found.add(key);
+          conflicts.push({ medication: med.name, allergy: allergy.name });
+        }
+        continue;
+      }
+
+      // 2. Drug class cross-reactivity (e.g., penicillin allergy → flag amoxicillin)
+      const relatedDrugs = getRelatedDrugs(allergy.name);
+      if (relatedDrugs.some((r) => medName.includes(r) || r.includes(medName))) {
+        if (!found.has(key)) {
+          found.add(key);
+          const allergyFamily = getDrugFamily(allergy.name);
+          const medFamily = getDrugFamily(med.name);
+          const isCrossClass = allergyFamily !== medFamily;
+          conflicts.push({
+            medication: med.name,
+            allergy: isCrossClass
+              ? `${allergy.name} (cross-reactivity)`
+              : `${allergy.name} (same drug class)`,
+          });
+        }
       }
     }
   }
+
+  // 3. Check if allergen drugs have known interactions with current meds
+  //    e.g., allergic to amoxicillin → amoxicillin interacts with warfarin → flag it
+  for (const allergy of allergies) {
+    const allergyLower = allergy.name.toLowerCase();
+    for (const med of medications) {
+      const medLower = med.name.toLowerCase();
+      const key = `interaction_${medLower}|||${allergyLower}`;
+      if (found.has(key)) continue;
+
+      // Check if the allergen drug has a known interaction with this medication
+      for (const interaction of CRITICAL_INTERACTIONS) {
+        const matchA = allergyLower.includes(interaction.drug1) && medLower.includes(interaction.drug2);
+        const matchB = allergyLower.includes(interaction.drug2) && medLower.includes(interaction.drug1);
+        if (matchA || matchB) {
+          found.add(key);
+          conflicts.push({
+            medication: med.name,
+            allergy: `${allergy.name} (known interaction: ${interaction.description})`,
+          });
+          break;
+        }
+      }
+    }
+  }
+
   return conflicts;
 }
 

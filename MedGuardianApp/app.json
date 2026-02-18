@@ -13,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.goldhardcash.medguardian",
+      "infoPlist": {
+        "NSCameraUsageDescription": "MedGuardian needs camera access to scan medication labels",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +30,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "665af0cd-250e-4064-bec7-97ad0e53c751"
+      }
+    },
+    "owner": "goldhardcash"
   }
 }

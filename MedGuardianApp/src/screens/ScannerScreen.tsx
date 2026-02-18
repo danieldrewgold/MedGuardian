@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { CameraView, BarcodeScanningResult } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { scanBase64Image, ScanResult } from '../services/scanner';
+import { scanBase64Image, ScanResult, identifyPills, PillIdResult } from '../services/scanner';
 import { lookupNDC } from '../services/openfda';
+
+type ScanMode = 'label' | 'pill';
 
 interface ScannedMed {
   id: string;
@@ -21,6 +23,20 @@ interface ScannedMed {
   doctor: string;
   refillDate: string;
   justUpdated: boolean; // for green dot indicator
+}
+
+interface IdentifiedPill {
+  id: string;
+  name: string;
+  brandName: string;
+  dosage: string;
+  imprint: string;
+  shape: string;
+  color: string;
+  confidence: 'high' | 'medium' | 'low';
+  description: string;
+  fdaVerified?: boolean;
+  manufacturer?: string;
 }
 
 /**
@@ -63,6 +79,11 @@ export default function ScannerScreen({ navigation }: any) {
   const [scanCount, setScanCount] = useState(0);
   const scannedBarcodes = useRef<Set<string>>(new Set());
   const [barcodeLooking, setBarcodeLooking] = useState(false);
+
+  // Pill ID mode state
+  const [scanMode, setScanMode] = useState<ScanMode>('label');
+  const [identifiedPills, setIdentifiedPills] = useState<IdentifiedPill[]>([]);
+  const [pillAnalyzing, setPillAnalyzing] = useState(false);
 
   // Animations
   const borderFlash = useRef(new Animated.Value(0)).current;
@@ -212,9 +233,9 @@ export default function ScannerScreen({ navigation }: any) {
     });
   }, [showToast, flashGreen]);
 
-  // Auto-capture loop
+  // Auto-capture loop (label mode only)
   useEffect(() => {
-    if (!ready || hasPermission !== true) return;
+    if (!ready || hasPermission !== true || scanMode !== 'label') return;
 
     const captureFrame = async () => {
       if (analyzing || !cameraRef.current) return;
@@ -261,7 +282,7 @@ export default function ScannerScreen({ navigation }: any) {
       clearTimeout(initialDelay);
       clearInterval(interval);
     };
-  }, [ready, hasPermission, analyzing, scannedMeds, mergeResults]);
+  }, [ready, hasPermission, analyzing, scannedMeds, mergeResults, scanMode]);
 
   // Barcode scanning handler
   const handleBarcode = useCallback(async (scanResult: BarcodeScanningResult) => {
@@ -351,6 +372,123 @@ export default function ScannerScreen({ navigation }: any) {
     }
   };
 
+  // ─── Pill ID handlers ────────────────────────────────────────────────────
+  const handlePillCapture = async () => {
+    if (pillAnalyzing || !cameraRef.current) return;
+
+    setPillAnalyzing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.9,
+        base64: true,
+        shutterSound: false,
+      });
+
+      if (photo?.base64) {
+        const results = await identifyPills(photo.base64);
+        if (results.length > 0) {
+          const newPills: IdentifiedPill[] = results.map((r) => ({
+            id: `pill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            name: r.name || '',
+            brandName: r.brandName || '',
+            dosage: r.dosage || '',
+            imprint: r.imprint || '',
+            shape: r.shape || '',
+            color: r.color || '',
+            confidence: r.confidence || 'low',
+            description: r.description || '',
+            fdaVerified: r.fdaVerified,
+            manufacturer: r.manufacturer,
+          }));
+          setIdentifiedPills((prev) => [...prev, ...newPills]);
+          showToast(`Identified ${results.length} pill${results.length > 1 ? 's' : ''}`);
+          flashGreen();
+        } else {
+          showToast('No pills identified — try better lighting or closer angle');
+        }
+      }
+    } catch (error: any) {
+      showToast('Could not analyze pills');
+      console.log('Pill ID error:', error.message);
+    } finally {
+      setPillAnalyzing(false);
+    }
+  };
+
+  const handlePillPickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Needed', 'Photo library access is required.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.base64) return;
+
+      setPillAnalyzing(true);
+      const results = await identifyPills(result.assets[0].base64);
+      if (results.length > 0) {
+        const newPills: IdentifiedPill[] = results.map((r) => ({
+          id: `pill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          name: r.name || '',
+          brandName: r.brandName || '',
+          dosage: r.dosage || '',
+          imprint: r.imprint || '',
+          shape: r.shape || '',
+          color: r.color || '',
+          confidence: r.confidence || 'low',
+          description: r.description || '',
+          fdaVerified: r.fdaVerified,
+          manufacturer: r.manufacturer,
+        }));
+        setIdentifiedPills((prev) => [...prev, ...newPills]);
+        showToast(`Identified ${results.length} pill${results.length > 1 ? 's' : ''}`);
+        flashGreen();
+      } else {
+        showToast('No pills identified in image');
+      }
+    } catch (error: any) {
+      showToast('Could not analyze image');
+    } finally {
+      setPillAnalyzing(false);
+    }
+  };
+
+  const handleRemovePill = (id: string) => {
+    setIdentifiedPills((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handlePillDone = () => {
+    if (identifiedPills.length === 0) {
+      navigation.goBack();
+      return;
+    }
+    // Convert identified pills to scanned medications format and pass to AddMedicationScreen
+    navigation.navigate('AddMedication', {
+      scannedMedications: identifiedPills.map((p) => ({
+        name: p.name,
+        dosage: p.dosage,
+        doctor: '',
+        refillDate: '',
+      })),
+    });
+  };
+
+  const confidenceColor = (c: string) => {
+    switch (c) {
+      case 'high': return '#48bb78';
+      case 'medium': return '#ecc94b';
+      case 'low': return '#fc8181';
+      default: return '#a0aec0';
+    }
+  };
+
   if (hasPermission === null) {
     return (
       <View style={styles.centered}>
@@ -383,10 +521,10 @@ export default function ScannerScreen({ navigation }: any) {
         style={styles.camera}
         facing="back"
         onCameraReady={() => setReady(true)}
-        barcodeScannerSettings={{
+        barcodeScannerSettings={scanMode === 'label' ? {
           barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8', 'code128', 'datamatrix'],
-        }}
-        onBarcodeScanned={handleBarcode}
+        } : undefined}
+        onBarcodeScanned={scanMode === 'label' ? handleBarcode : undefined}
       />
 
       {/* Green flash border */}
@@ -395,18 +533,40 @@ export default function ScannerScreen({ navigation }: any) {
         pointerEvents="none"
       />
 
-      {/* Top bar: close + scanning indicator */}
+      {/* Top bar: close + mode toggle + indicator */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.closeBtnText}>X</Text>
         </TouchableOpacity>
 
+        {/* Mode toggle */}
+        <View style={styles.modeToggle}>
+          <TouchableOpacity
+            style={[styles.modeBtn, scanMode === 'label' && styles.modeBtnActive]}
+            onPress={() => setScanMode('label')}
+          >
+            <Text style={[styles.modeBtnText, scanMode === 'label' && styles.modeBtnTextActive]}>
+              Label
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeBtn, scanMode === 'pill' && styles.modeBtnActivePill]}
+            onPress={() => setScanMode('pill')}
+          >
+            <Text style={[styles.modeBtnText, scanMode === 'pill' && styles.modeBtnTextActive]}>
+              Pill ID
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.scanIndicator}>
           <Animated.View style={[styles.scanDot, { opacity: pulseAnim }]} />
           <Text style={styles.scanIndicatorText}>
-            {analyzing ? 'Analyzing...' : 'Scanning'}
+            {scanMode === 'pill'
+              ? (pillAnalyzing ? 'Analyzing...' : 'Ready')
+              : (analyzing ? 'Analyzing...' : 'Scanning')}
           </Text>
-          {scanCount > 0 && (
+          {scanMode === 'label' && scanCount > 0 && (
             <Text style={styles.scanCountText}> ({scanCount} frames)</Text>
           )}
         </View>
@@ -419,59 +579,153 @@ export default function ScannerScreen({ navigation }: any) {
         </Animated.View>
       )}
 
+      {/* Pill ID: capture button overlay in center */}
+      {scanMode === 'pill' && !pillAnalyzing && (
+        <View style={styles.pillCaptureOverlay}>
+          <TouchableOpacity style={styles.pillCaptureBtn} onPress={handlePillCapture}>
+            <View style={styles.pillCaptureBtnInner} />
+          </TouchableOpacity>
+          <Text style={styles.pillCaptureHint}>Tap to identify pills</Text>
+        </View>
+      )}
+
+      {scanMode === 'pill' && pillAnalyzing && (
+        <View style={styles.pillCaptureOverlay}>
+          <View style={styles.pillAnalyzingBox}>
+            <Text style={styles.pillAnalyzingText}>Analyzing pills...</Text>
+            <Text style={styles.pillAnalyzingSubtext}>Checking imprints, shape & color</Text>
+          </View>
+        </View>
+      )}
+
       {/* Bottom overlay: results + actions */}
       <View style={styles.bottomOverlay}>
-        {scannedMeds.length === 0 ? (
-          <View style={styles.emptyOverlay}>
-            <Text style={styles.emptyText}>Point camera at pill bottles</Text>
-            <Text style={styles.emptySubtext}>Scan labels or barcodes — medications appear as detected</Text>
-          </View>
-        ) : (
-          <ScrollView style={styles.resultsList} nestedScrollEnabled>
-            {scannedMeds.map((med) => (
-              <View key={med.id} style={styles.resultCard}>
-                {med.justUpdated && <View style={styles.greenDot} />}
-                <View style={styles.resultInfo}>
-                  <Text style={styles.resultName} numberOfLines={1}>
-                    {med.name || 'Unknown'}
-                    {med.dosage ? ` ${med.dosage}` : ''}
-                  </Text>
-                  {med.doctor ? (
-                    <Text style={styles.resultDoctor} numberOfLines={1}>Dr. {med.doctor}</Text>
-                  ) : (
-                    <Text style={styles.resultNoDoctor}>Rotate bottle to capture doctor</Text>
-                  )}
-                  {med.refillDate ? (
-                    <Text style={styles.resultDoctor} numberOfLines={1}>Refill: {med.refillDate}</Text>
-                  ) : null}
-                </View>
-                <TouchableOpacity
-                  style={styles.removeBtn}
-                  onPress={() => handleRemoveMed(med.id)}
-                >
-                  <Text style={styles.removeBtnText}>x</Text>
-                </TouchableOpacity>
+        {scanMode === 'label' ? (
+          <>
+            {scannedMeds.length === 0 ? (
+              <View style={styles.emptyOverlay}>
+                <Text style={styles.emptyText}>Point camera at pill bottles</Text>
+                <Text style={styles.emptySubtext}>Scan labels or barcodes — medications appear as detected</Text>
               </View>
-            ))}
-          </ScrollView>
-        )}
+            ) : (
+              <ScrollView style={styles.resultsList} nestedScrollEnabled>
+                {scannedMeds.map((med) => (
+                  <View key={med.id} style={styles.resultCard}>
+                    {med.justUpdated && <View style={styles.greenDot} />}
+                    <View style={styles.resultInfo}>
+                      <Text style={styles.resultName} numberOfLines={1}>
+                        {med.name || 'Unknown'}
+                        {med.dosage ? ` ${med.dosage}` : ''}
+                      </Text>
+                      {med.doctor ? (
+                        <Text style={styles.resultDoctor} numberOfLines={1}>Dr. {med.doctor}</Text>
+                      ) : (
+                        <Text style={styles.resultNoDoctor}>Rotate bottle to capture doctor</Text>
+                      )}
+                      {med.refillDate ? (
+                        <Text style={styles.resultDoctor} numberOfLines={1}>Refill: {med.refillDate}</Text>
+                      ) : null}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() => handleRemoveMed(med.id)}
+                    >
+                      <Text style={styles.removeBtnText}>x</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
 
-        {/* Action buttons */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.galleryBtn} onPress={handlePickImage}>
-            <Text style={styles.galleryBtnText}>From Gallery</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.doneBtn, scannedMeds.length === 0 && styles.doneBtnDisabled]}
-            onPress={handleDone}
-          >
-            <Text style={styles.doneBtnText}>
-              {scannedMeds.length === 0
-                ? 'Cancel'
-                : `Done (${scannedMeds.length} found)`}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {/* Label mode action buttons */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.galleryBtn} onPress={handlePickImage}>
+                <Text style={styles.galleryBtnText}>From Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.doneBtn, scannedMeds.length === 0 && styles.doneBtnDisabled]}
+                onPress={handleDone}
+              >
+                <Text style={styles.doneBtnText}>
+                  {scannedMeds.length === 0
+                    ? 'Cancel'
+                    : `Done (${scannedMeds.length} found)`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            {/* Pill ID mode results */}
+            {identifiedPills.length === 0 ? (
+              <View style={styles.emptyOverlay}>
+                <Text style={styles.emptyText}>Identify pills by photo</Text>
+                <Text style={styles.emptySubtext}>
+                  Place pills on a flat surface with good lighting{'\n'}Tap the capture button or use gallery
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.resultsList} nestedScrollEnabled>
+                {identifiedPills.map((pill) => (
+                  <View key={pill.id} style={styles.pillResultCard}>
+                    <View style={styles.resultInfo}>
+                      <View style={styles.pillResultHeader}>
+                        <Text style={styles.resultName} numberOfLines={1}>
+                          {pill.name || 'Unknown pill'}
+                          {pill.dosage ? ` ${pill.dosage}` : ''}
+                        </Text>
+                        <View style={[styles.confidenceBadge, { backgroundColor: confidenceColor(pill.confidence) }]}>
+                          <Text style={styles.confidenceText}>{pill.confidence}</Text>
+                        </View>
+                      </View>
+                      {pill.brandName ? (
+                        <Text style={styles.resultDoctor} numberOfLines={1}>Brand: {pill.brandName}</Text>
+                      ) : null}
+                      <Text style={styles.pillDetails} numberOfLines={1}>
+                        {[pill.color, pill.shape, pill.imprint ? `"${pill.imprint}"` : ''].filter(Boolean).join(' · ')}
+                      </Text>
+                      {pill.description ? (
+                        <Text style={styles.pillDescription} numberOfLines={2}>{pill.description}</Text>
+                      ) : null}
+                      {pill.fdaVerified && (
+                        <Text style={styles.pillFdaVerified}>FDA verified</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() => handleRemovePill(pill.id)}
+                    >
+                      <Text style={styles.removeBtnText}>x</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Pill ID mode action buttons */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.galleryBtn} onPress={handlePillPickImage}>
+                <Text style={styles.galleryBtnText}>From Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.doneBtn, identifiedPills.length === 0 && styles.doneBtnDisabled]}
+                onPress={handlePillDone}
+              >
+                <Text style={styles.doneBtnText}>
+                  {identifiedPills.length === 0
+                    ? 'Cancel'
+                    : `Add ${identifiedPills.length} to Meds`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {identifiedPills.length > 0 && (
+              <Text style={styles.pillDisclaimer}>
+                Visual pill identification is approximate. Always verify with your pharmacist.
+              </Text>
+            )}
+          </>
+        )}
       </View>
     </View>
   );
@@ -632,4 +886,133 @@ const styles = StyleSheet.create({
     backgroundColor: '#667eea',
   },
   doneBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  // Mode toggle
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  modeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+  },
+  modeBtnActive: {
+    backgroundColor: '#48bb78',
+  },
+  modeBtnActivePill: {
+    backgroundColor: '#667eea',
+  },
+  modeBtnText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modeBtnTextActive: {
+    color: '#fff',
+  },
+
+  // Pill capture button
+  pillCaptureOverlay: {
+    position: 'absolute',
+    top: '40%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  pillCaptureBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillCaptureBtnInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  pillCaptureHint: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 10,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  pillAnalyzingBox: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  pillAnalyzingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  pillAnalyzingSubtext: {
+    color: '#a0aec0',
+    fontSize: 13,
+    marginTop: 4,
+  },
+
+  // Pill result cards
+  pillResultCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  pillResultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  confidenceBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  confidenceText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  pillDetails: {
+    color: '#a0aec0',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  pillDescription: {
+    color: '#cbd5e0',
+    fontSize: 11,
+    marginTop: 3,
+    fontStyle: 'italic',
+  },
+  pillFdaVerified: {
+    color: '#48bb78',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 3,
+    textTransform: 'uppercase',
+  },
+  pillDisclaimer: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 8,
+  },
 });
