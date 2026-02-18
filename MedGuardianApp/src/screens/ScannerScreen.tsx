@@ -379,7 +379,7 @@ export default function ScannerScreen({ navigation }: any) {
     setPillAnalyzing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
+        quality: 1.0,
         base64: true,
         shutterSound: false,
       });
@@ -404,7 +404,7 @@ export default function ScannerScreen({ navigation }: any) {
           showToast(`Identified ${results.length} pill${results.length > 1 ? 's' : ''}`);
           flashGreen();
         } else {
-          showToast('No pills identified — try better lighting or closer angle');
+          showToast('No pills found — get closer and use bright lighting');
         }
       }
     } catch (error: any) {
@@ -425,7 +425,7 @@ export default function ScannerScreen({ navigation }: any) {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.8,
+        quality: 1.0,
         base64: true,
       });
 
@@ -585,7 +585,7 @@ export default function ScannerScreen({ navigation }: any) {
           <TouchableOpacity style={styles.pillCaptureBtn} onPress={handlePillCapture}>
             <View style={styles.pillCaptureBtnInner} />
           </TouchableOpacity>
-          <Text style={styles.pillCaptureHint}>Tap to identify pills</Text>
+          <Text style={styles.pillCaptureHint}>Get close, then tap to capture</Text>
         </View>
       )}
 
@@ -661,7 +661,7 @@ export default function ScannerScreen({ navigation }: any) {
               <View style={styles.emptyOverlay}>
                 <Text style={styles.emptyText}>Identify pills by photo</Text>
                 <Text style={styles.emptySubtext}>
-                  Place pills on a flat surface with good lighting{'\n'}Tap the capture button or use gallery
+                  Place pills on a dark, flat surface{'\n'}Get close — fill the frame with the pill{'\n'}Good lighting helps read imprint codes
                 </Text>
               </View>
             ) : (

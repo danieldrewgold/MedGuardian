@@ -191,41 +191,65 @@ app.post('/api/pill-id', pillIdLimiter, async (req, res) => {
     return;
   }
 
-  const prompt = `You are a pill identification assistant. Look at this image of pills/tablets/capsules.
+  const prompt = `You are an expert pill identification assistant used by healthcare professionals. Carefully analyze this image to identify ALL pills/tablets/capsules visible.
 
-For EACH distinct pill visible in the image, analyze:
-1. SHAPE: round, oval, oblong, capsule, diamond, square, rectangle, triangle, other
-2. COLOR: the primary color(s) — white, yellow, blue, pink, red, orange, green, brown, tan, peach, purple, gray, etc. Note if two-toned.
-3. IMPRINT: any text, numbers, letters, or symbols stamped/printed on the pill. Check BOTH sides if visible. Common formats: "IP 204", "M523", "TEVA", "G 31", "L484", "watson 853".
-4. SCORING: is there a score line (dividing line) on the pill?
-5. COATING: film-coated, sugar-coated, uncoated, enteric-coated, gel-cap
-6. SIZE: estimate approximate size (small <7mm, medium 7-12mm, large >12mm)
+STEP 1 — OBSERVE EVERY DETAIL:
+For each distinct pill, examine:
+- SHAPE: round, oval, oblong, capsule, diamond, square, rectangle, triangle, other
+- COLOR: primary color(s) — white, off-white, yellow, blue, pink, red, orange, green, brown, tan, peach, purple, gray. Note if two-toned or speckled.
+- IMPRINT: Look VERY carefully for any text, numbers, letters, logos, or symbols. These may be VERY faint, debossed (pressed in), or small. Zoom in mentally. Check BOTH sides. Common formats: "IP 204", "M523", "TEVA", "G 31", "L484", "watson 853", "U 135".
+- SCORING: score line (dividing line) present?
+- COATING: film-coated (shiny), sugar-coated, uncoated (matte/chalky), enteric-coated, gel-cap
+- SIZE: small (<7mm), medium (7-12mm), large (>12mm)
+- TEXTURE: smooth, rough, powdery surface
 
-Then IDENTIFY the medication:
-- Use the imprint code as the PRIMARY identifier — most US prescription pills have a unique imprint
-- Cross-reference shape + color + imprint to identify the exact medication
-- Provide the generic drug name, brand name if known, and strength/dosage
+STEP 2 — IDENTIFY USING MULTIPLE METHODS:
+Method A (strongest): If you can read an imprint code, use it as primary identifier.
+Method B (strong): If imprint is unclear, use the COMBINATION of shape + color + size + coating to narrow down candidates. Many common medications have distinctive appearances:
+  - Small white round tablets are extremely common (lisinopril, metformin, atenolol, minoxidil, etc.)
+  - Small white oval/oblong = often metformin, acetaminophen, etc.
+  - Blue round = often sildenafil, oxycodone, adderall
+  - Pink/peach round = often lisinopril, hydrochlorothiazide
+  - Capsules with two colors = often identifiable by color combination
+Method C (moderate): Consider context — what are common US prescription medications that match these physical characteristics? Think about the most commonly prescribed drugs.
 
-For each pill, respond with this JSON format. Return ONLY a JSON array:
+COMMON SMALL PILL REFERENCE (many are small white round tablets — look for subtle differences):
+- Minoxidil 2.5mg/10mg: small white round, may have "U 135" or "M" markings, often scored
+- Lisinopril 10mg/20mg: small round, may be white/pink/peach
+- Metformin 500mg: white, usually oval/oblong, relatively large
+- Atenolol 25mg/50mg: small white round
+- Amlodipine 5mg/10mg: small white/yellowish round or octagonal
+- Hydrochlorothiazide 25mg: small white/peach round
+- Metoprolol 25mg/50mg: small white round, often scored
+- Losartan 25mg/50mg: white/green oval
+- Levothyroxine: color-coded by dose (white, orange, blue, etc.)
+- Prednisone 5mg/10mg: small white round, scored
+
+STEP 3 — ALWAYS PROVIDE YOUR BEST IDENTIFICATION:
+Even if you're not 100% certain, provide your best educated assessment based on physical characteristics. Use confidence levels honestly:
+- "high": Imprint clearly readable OR very distinctive appearance
+- "medium": Partial imprint visible OR physical characteristics strongly suggest a specific drug
+- "low": No imprint visible, identification based on shape/color/size alone — but STILL provide your best guess
+
+Return ONLY a JSON array:
 [{
   "name": "generic drug name",
   "brandName": "brand name or empty string",
   "dosage": "strength e.g. 10mg",
-  "imprint": "text on pill e.g. IP 204",
+  "imprint": "text visible on pill, or 'not visible' if none seen",
   "shape": "round/oval/oblong/capsule/etc",
   "color": "white/blue/etc",
   "scoring": "scored/unscored",
   "confidence": "high/medium/low",
-  "description": "brief 1-sentence identification note"
+  "description": "1-2 sentence note explaining identification reasoning"
 }]
 
-IMPORTANT RULES:
-- If you can clearly read an imprint code, identify the pill based on that — this is the most reliable method
-- If no imprint is visible or the pill is hard to identify, set confidence to "low" and provide your best guess with the description explaining uncertainty
-- Return empty array [] if no pills are visible or the image is not of pills
-- Do NOT guess wildly — if truly unidentifiable, say so in description with confidence "low"
-- Many OTC pills (like acetaminophen, ibuprofen) have well-known imprints: L484 = acetaminophen 500mg, I-2 = ibuprofen 200mg, etc.
-- If multiple identical pills are visible, return ONE entry (not duplicates)
+CRITICAL RULES:
+- NEVER return an empty array if pills ARE visible in the image. Always attempt identification.
+- If a pill is hard to identify, still return an entry with confidence "low" and your best guess.
+- Return [] ONLY if the image contains NO pills at all.
+- If multiple identical pills are visible, return ONE entry.
+- For each pill, explain WHY you identified it that way in the description field.
 
 Respond with ONLY the JSON array, no markdown, no other text.`;
 
