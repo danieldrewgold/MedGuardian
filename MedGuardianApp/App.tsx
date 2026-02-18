@@ -7,6 +7,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import AddMedicationScreen from './src/screens/AddMedicationScreen';
 import ScannerScreen from './src/screens/ScannerScreen';
 import MedicationDetailScreen from './src/screens/MedicationDetailScreen';
+import AskScreen from './src/screens/AskScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -40,6 +41,16 @@ export default function App() {
             component={MedicationDetailScreen}
             options={{
               title: 'Medication Info',
+              headerStyle: { backgroundColor: '#667eea' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: '700' },
+            }}
+          />
+          <Stack.Screen
+            name="Ask"
+            component={AskScreen}
+            options={{
+              title: 'Ask MedGuardian',
               headerStyle: { backgroundColor: '#667eea' },
               headerTintColor: '#fff',
               headerTitleStyle: { fontWeight: '700' },

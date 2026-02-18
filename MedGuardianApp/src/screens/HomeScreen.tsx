@@ -877,6 +877,16 @@ export default function HomeScreen({ navigation }: any) {
         <Text style={styles.addMedBtnText}>Add Medication</Text>
       </TouchableOpacity>
 
+      {/* Ask MedGuardian Button */}
+      <TouchableOpacity
+        style={styles.askBtn}
+        onPress={() => navigation.navigate('Ask')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.askBtnIcon}>?</Text>
+        <Text style={styles.askBtnText}>Ask MedGuardian</Text>
+      </TouchableOpacity>
+
       {/* Interaction Checker */}
       {patient.medications.length > 0 && (
         <View style={styles.interactionCheckSection}>
@@ -1201,6 +1211,23 @@ const styles = StyleSheet.create({
   },
   addMedBtnIcon: { color: '#fff', fontSize: 22, fontWeight: '700' },
   addMedBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  askBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#38b2ac',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 8,
+    elevation: 2,
+    shadowColor: '#38b2ac',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  askBtnIcon: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  askBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
   patientDropdownBtn: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -369,6 +369,110 @@ Respond with ONLY the JSON array, no markdown, no other text.`;
   }
 });
 
+// ─── Ask MedGuardian Health Q&A Endpoint ────────────────────────────────────
+
+const askLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: 'Too many questions. Please try again in a minute.' },
+});
+
+app.post('/api/ask', askLimiter, async (req, res) => {
+  const { question, medications, allergies, patientName } = req.body;
+
+  if (!question || typeof question !== 'string' || question.trim().length < 3) {
+    res.status(400).json({ error: 'Please provide a question (at least 3 characters).' });
+    return;
+  }
+
+  // Build medication-aware system context
+  let medContext = '';
+  if (medications && Array.isArray(medications) && medications.length > 0) {
+    medContext += `\nPATIENT'S CURRENT MEDICATIONS:\n`;
+    medications.forEach((med: any) => {
+      let line = `- ${med.name}`;
+      if (med.dosage) line += ` ${med.dosage}`;
+      if (med.frequency) line += ` (${med.frequency})`;
+      if (med.reason) line += ` — for: ${med.reason}`;
+      medContext += `${line}\n`;
+    });
+  }
+
+  if (allergies && Array.isArray(allergies) && allergies.length > 0) {
+    medContext += `\nPATIENT'S ALLERGIES: ${allergies.join(', ')}\n`;
+  }
+
+  const systemPrompt = `You are MedGuardian Assistant, an AI health assistant built into a medication tracking app used by patients and their healthcare providers (PAs, nurses, doctors).
+
+Your role is to provide helpful, accurate health information while being mindful of the patient's current medications and allergies.
+
+CONTEXT — This patient's medication profile:
+${medContext || 'No medications or allergies on file.'}
+
+GUIDELINES:
+1. ALWAYS consider the patient's current medications and allergies when answering. If their question relates to a symptom that could be a medication side effect, mention that possibility.
+2. If a question involves recommending an OTC medication or supplement, CHECK for potential interactions with their current meds and allergies first.
+3. Be practical and actionable — give specific, helpful advice they can use.
+4. Keep answers concise but thorough — aim for 2-4 short paragraphs.
+5. Use simple, patient-friendly language (avoid medical jargon unless necessary, and explain terms if used).
+6. ALWAYS end with a brief note to consult their healthcare provider for personalized medical advice, especially for new or worsening symptoms.
+7. If a question is clearly outside your scope (emergency symptoms, mental health crisis, etc.), advise them to seek immediate medical attention.
+8. Do NOT diagnose conditions — suggest possibilities and recommend professional evaluation.
+9. When relevant, mention if any of their current medications could be contributing to the issue they're asking about.
+
+FORMAT: Respond in plain text. Use short paragraphs. Do NOT use markdown formatting, headers, bullet points, or special characters — just clean readable text.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY!,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: question.trim(),
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Anthropic API error (${response.status}):`, errorText.substring(0, 300));
+      res.status(502).json({ error: 'Could not get a response. Please try again.' });
+      return;
+    }
+
+    const data: any = await response.json();
+    let answer = '';
+
+    if (data.content && Array.isArray(data.content)) {
+      for (const block of data.content) {
+        if (block.type === 'text' && block.text) {
+          answer += block.text;
+        }
+      }
+    }
+
+    if (!answer) {
+      res.status(502).json({ error: 'Empty response from AI. Please try again.' });
+      return;
+    }
+
+    res.json({ answer: answer.trim() });
+  } catch (error: any) {
+    console.error('Ask error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`MedGuardian server running on 0.0.0.0:${PORT}`);
 });
