@@ -42,6 +42,36 @@ const authMiddleware = (req: express.Request, res: express.Response, next: expre
 
 app.use('/api', authMiddleware);
 
+// ─── Global Daily API Call Budget ────────────────────────────────────────────
+// Caps total Anthropic API calls per day across ALL users to prevent runaway costs.
+// Resets at midnight UTC. Configurable via DAILY_API_LIMIT env var (default: 500).
+const DAILY_API_LIMIT = parseInt(process.env.DAILY_API_LIMIT || '500', 10);
+let dailyApiCalls = 0;
+let dailyResetDate = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+function checkAndIncrementDailyLimit(): boolean {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== dailyResetDate) {
+    // New day — reset counter
+    dailyApiCalls = 0;
+    dailyResetDate = today;
+    console.log(`Daily API counter reset for ${today}`);
+  }
+  if (dailyApiCalls >= DAILY_API_LIMIT) {
+    return false; // Over limit
+  }
+  dailyApiCalls++;
+  return true;
+}
+
+function getDailyUsage() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== dailyResetDate) {
+    return { used: 0, limit: DAILY_API_LIMIT, remaining: DAILY_API_LIMIT };
+  }
+  return { used: dailyApiCalls, limit: DAILY_API_LIMIT, remaining: DAILY_API_LIMIT - dailyApiCalls };
+}
+
 const scanLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30, // Higher limit for live scanning (~12 requests/min at 5s intervals)
@@ -49,7 +79,7 @@ const scanLimiter = rateLimit({
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', usage: getDailyUsage() });
 });
 
 app.post('/api/scan', scanLimiter, async (req, res) => {
@@ -57,6 +87,11 @@ app.post('/api/scan', scanLimiter, async (req, res) => {
 
   if (!image || typeof image !== 'string') {
     res.status(400).json({ error: 'Missing "image" field (base64 string)' });
+    return;
+  }
+
+  if (!checkAndIncrementDailyLimit()) {
+    res.status(429).json({ error: 'Daily usage limit reached. Service resets at midnight UTC. Try again tomorrow!' });
     return;
   }
 
@@ -209,6 +244,11 @@ app.post('/api/pill-id', pillIdLimiter, async (req, res) => {
 
   if (!image || typeof image !== 'string') {
     res.status(400).json({ error: 'Missing "image" field (base64 string)' });
+    return;
+  }
+
+  if (!checkAndIncrementDailyLimit()) {
+    res.status(429).json({ error: 'Daily usage limit reached. Service resets at midnight UTC. Try again tomorrow!' });
     return;
   }
 
@@ -403,6 +443,11 @@ app.post('/api/ask', askLimiter, async (req, res) => {
 
   if (!question || typeof question !== 'string' || question.trim().length < 3) {
     res.status(400).json({ error: 'Please provide a question (at least 3 characters).' });
+    return;
+  }
+
+  if (!checkAndIncrementDailyLimit()) {
+    res.status(429).json({ error: 'Daily usage limit reached. Service resets at midnight UTC. Try again tomorrow!' });
     return;
   }
 

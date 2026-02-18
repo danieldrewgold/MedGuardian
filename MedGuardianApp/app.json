@@ -18,7 +18,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "MedGuardian needs camera access to scan medication labels",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
