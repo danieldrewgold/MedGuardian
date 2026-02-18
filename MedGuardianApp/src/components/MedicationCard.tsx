@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Medication, Interaction, AllergyConflict } from '../types';
+import { getSideEffectsFromDB } from '../services/sideEffects';
 
 interface Props {
   medication: Medication;
@@ -18,6 +19,7 @@ export default function MedicationCard({ medication, interactions, allergyConfli
   const criticalInteraction = interactions.find(
     (i) => (i.med1 === medication.name || i.med2 === medication.name) && i.severity === 'major'
   );
+  const hasSideEffects = useMemo(() => !!getSideEffectsFromDB(medication.name), [medication.name]);
 
   const cardStyle = allergyConflict || criticalInteraction
     ? styles.critical
@@ -81,19 +83,26 @@ export default function MedicationCard({ medication, interactions, allergyConfli
         <Text style={styles.dateAdded}>Added {new Date(medication.addedDate).toLocaleDateString()}</Text>
       </View>
 
-      {allergyConflict ? (
-        <View style={[styles.badge, styles.criticalBadge]}>
-          <Text style={styles.badgeText}>ALLERGY NOTED - See Details Above</Text>
-        </View>
-      ) : criticalInteraction ? (
-        <View style={[styles.badge, styles.criticalBadge]}>
-          <Text style={styles.badgeText}>Interaction Info Available</Text>
-        </View>
-      ) : hasInteraction ? (
-        <View style={[styles.badge, styles.warningBadge]}>
-          <Text style={styles.badgeText}>Interaction Info</Text>
-        </View>
-      ) : null}
+      <View style={styles.badgeRow}>
+        {allergyConflict ? (
+          <View style={[styles.badge, styles.criticalBadge]}>
+            <Text style={styles.badgeText}>ALLERGY NOTED - See Details Above</Text>
+          </View>
+        ) : criticalInteraction ? (
+          <View style={[styles.badge, styles.criticalBadge]}>
+            <Text style={styles.badgeText}>Interaction Info Available</Text>
+          </View>
+        ) : hasInteraction ? (
+          <View style={[styles.badge, styles.warningBadge]}>
+            <Text style={styles.badgeText}>Interaction Info</Text>
+          </View>
+        ) : null}
+        {hasSideEffects && (
+          <View style={[styles.badge, styles.sideEffectBadge]}>
+            <Text style={styles.seBadgeText}>Side Effects Info</Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -118,10 +127,13 @@ const styles = StyleSheet.create({
   overdue: { color: '#c53030', fontWeight: '600' },
   upcoming: { color: '#d69e2e', fontWeight: '600' },
   dateAdded: { fontSize: 12, color: '#a0aec0', marginTop: 4 },
-  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, marginTop: 10, alignSelf: 'flex-start' },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, alignSelf: 'flex-start' },
   warningBadge: { backgroundColor: '#fc8181' },
   criticalBadge: { backgroundColor: '#f56565' },
+  sideEffectBadge: { backgroundColor: '#eef2ff', borderWidth: 1, borderColor: '#c7d2fe' },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  seBadgeText: { color: '#667eea', fontSize: 12, fontWeight: '600' },
   reasonRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 2 },
   reasonChip: {
     backgroundColor: '#edf2f7',

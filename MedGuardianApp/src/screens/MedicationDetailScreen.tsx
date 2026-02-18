@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Medication } from '../types';
 import { fetchDrugLabel, DrugLabelInfo } from '../services/openfda';
+import { getSideEffects, SideEffectProfile } from '../services/sideEffects';
 
 interface Section {
   title: string;
@@ -29,6 +30,7 @@ export default function MedicationDetailScreen({ route, navigation }: any) {
   const [labelInfo, setLabelInfo] = useState<DrugLabelInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [showAllSideEffects, setShowAllSideEffects] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -37,6 +39,10 @@ export default function MedicationDetailScreen({ route, navigation }: any) {
       setLoading(false);
     })();
   }, [medication.name]);
+
+  const sideEffects = useMemo<SideEffectProfile | null>(() => {
+    return getSideEffects(medication.name, labelInfo?.adverseReactions);
+  }, [medication.name, labelInfo]);
 
   const toggleSection = (key: string) => {
     setExpandedSections((prev) => {
@@ -109,6 +115,92 @@ export default function MedicationDetailScreen({ route, navigation }: any) {
           <Text style={styles.editBtnText}>Edit Medication</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Side Effects Section */}
+      {sideEffects && (
+        <View style={styles.sideEffectsCard}>
+          <Text style={styles.sideEffectsTitle}>Side Effects</Text>
+
+          {sideEffects.common.length > 0 && (
+            <View style={styles.seCategory}>
+              <View style={styles.seCategoryHeader}>
+                <View style={[styles.seDot, styles.seDotCommon]} />
+                <Text style={styles.seCategoryLabel}>Common</Text>
+              </View>
+              <View style={styles.seChips}>
+                {sideEffects.common.map((effect, i) => (
+                  <View key={i} style={[styles.seChip, styles.seChipCommon]}>
+                    <Text style={styles.seChipText}>{effect}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {sideEffects.lessCommon.length > 0 && (
+            <View style={styles.seCategory}>
+              <View style={styles.seCategoryHeader}>
+                <View style={[styles.seDot, styles.seDotLessCommon]} />
+                <Text style={styles.seCategoryLabel}>Less Common</Text>
+              </View>
+              <View style={styles.seChips}>
+                {sideEffects.lessCommon.map((effect, i) => (
+                  <View key={i} style={[styles.seChip, styles.seChipLessCommon]}>
+                    <Text style={styles.seChipText}>{effect}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {showAllSideEffects && sideEffects.rare.length > 0 && (
+            <View style={styles.seCategory}>
+              <View style={styles.seCategoryHeader}>
+                <View style={[styles.seDot, styles.seDotRare]} />
+                <Text style={styles.seCategoryLabel}>Rare</Text>
+              </View>
+              <View style={styles.seChips}>
+                {sideEffects.rare.map((effect, i) => (
+                  <View key={i} style={[styles.seChip, styles.seChipRare]}>
+                    <Text style={styles.seChipText}>{effect}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {showAllSideEffects && sideEffects.serious.length > 0 && (
+            <View style={styles.seCategory}>
+              <View style={styles.seCategoryHeader}>
+                <Text style={styles.seWarningIcon}>⚠️</Text>
+                <Text style={[styles.seCategoryLabel, { color: '#c53030' }]}>Seek Medical Attention</Text>
+              </View>
+              <View style={styles.seChips}>
+                {sideEffects.serious.map((effect, i) => (
+                  <View key={i} style={[styles.seChip, styles.seChipSerious]}>
+                    <Text style={[styles.seChipText, { color: '#9b2c2c' }]}>{effect}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {(sideEffects.rare.length > 0 || sideEffects.serious.length > 0) && (
+            <TouchableOpacity
+              style={styles.seToggle}
+              onPress={() => setShowAllSideEffects(!showAllSideEffects)}
+            >
+              <Text style={styles.seToggleText}>
+                {showAllSideEffects ? 'Show less' : 'Show rare & serious side effects'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.seDisclaimer}>
+            Not all side effects are listed. Contact your healthcare provider for medical advice.
+          </Text>
+        </View>
+      )}
 
       {/* Education Section */}
       <Text style={styles.sectionHeader}>Drug Information (FDA)</Text>
@@ -236,6 +328,97 @@ const styles = StyleSheet.create({
     borderTopColor: '#f0f0f0',
   },
   accordionText: { fontSize: 14, color: '#4a5568', lineHeight: 22 },
+
+  // ── Side Effects ──
+  sideEffectsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+  },
+  sideEffectsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2d3748',
+    marginBottom: 14,
+  },
+  seCategory: {
+    marginBottom: 14,
+  },
+  seCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  seDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  seDotCommon: { backgroundColor: '#d69e2e' },
+  seDotLessCommon: { backgroundColor: '#667eea' },
+  seDotRare: { backgroundColor: '#a0aec0' },
+  seCategoryLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4a5568',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  seChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  seChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  seChipCommon: {
+    backgroundColor: '#fefce8',
+    borderColor: '#facc15',
+  },
+  seChipLessCommon: {
+    backgroundColor: '#eef2ff',
+    borderColor: '#c7d2fe',
+  },
+  seChipRare: {
+    backgroundColor: '#f7fafc',
+    borderColor: '#e2e8f0',
+  },
+  seChipSerious: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#feb2b2',
+  },
+  seChipText: {
+    fontSize: 13,
+    color: '#4a5568',
+  },
+  seWarningIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  seToggle: {
+    marginTop: 4,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  seToggleText: {
+    fontSize: 13,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+  seDisclaimer: {
+    fontSize: 11,
+    color: '#a0aec0',
+    marginTop: 8,
+    textAlign: 'center',
+  },
 
   disclaimer: {
     fontSize: 11,
