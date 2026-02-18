@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
 import AutocompleteInput from '../components/AutocompleteInput';
@@ -210,9 +211,14 @@ export default function AddMedicationScreen({ navigation, route }: any) {
     : 'Add Medication';
 
   return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={90}
+    >
     <ScrollView
       ref={scrollRef}
-      style={styles.container}
+      style={{ flex: 1 }}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
@@ -442,7 +448,9 @@ export default function AddMedicationScreen({ navigation, route }: any) {
           </TouchableOpacity>
         )}
       </View>
+      <View style={{ height: 40 }} />
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

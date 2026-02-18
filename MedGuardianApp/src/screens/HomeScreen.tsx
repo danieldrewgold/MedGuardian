@@ -571,6 +571,7 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <View style={{ flex: 1 }}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {/* Patient Selector */}
       {patientCount > 5 ? (
@@ -1005,8 +1006,9 @@ export default function HomeScreen({ navigation }: any) {
 
       <Text style={styles.footer}>* This app displays general medication information from public databases. Not medical advice. Consult your healthcare provider.</Text>
 
-      <View style={{ height: 20 }} />
+      <View style={{ height: 40 }} />
     </ScrollView>
+    </KeyboardAvoidingView>
 
     {/* Share Modal */}
     <Modal visible={showShareModal} animationType="slide" transparent>
