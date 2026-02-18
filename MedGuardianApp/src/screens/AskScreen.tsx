@@ -12,7 +12,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { API_URL } from '../config';
+import { API_URL, apiHeaders } from '../config';
 
 interface ChatMessage {
   id: string;
@@ -65,7 +65,7 @@ export default function AskScreen({ navigation }: any) {
     try {
       const response = await fetch(`${API_URL}/api/ask`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders,
         body: JSON.stringify({
           question: question.trim(),
           medications: activeMeds.map((m) => ({

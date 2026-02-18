@@ -12,6 +12,7 @@ import rateLimit from 'express-rate-limit';
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const APP_SECRET = process.env.APP_SECRET || 'mg_s3cur3_k8x2pQ7vR4wL9mN1bZ';
 
 if (!ANTHROPIC_API_KEY) {
   console.error('ANTHROPIC_API_KEY environment variable is required');
@@ -20,6 +21,26 @@ if (!ANTHROPIC_API_KEY) {
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// ─── API Secret Authentication Middleware ────────────────────────────────────
+// Protects all /api/* routes (except /api/health) from unauthorized access.
+// The app sends x-app-secret header with every request.
+const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Allow health checks without auth
+  if (req.path === '/api/health') {
+    next();
+    return;
+  }
+
+  const secret = req.headers['x-app-secret'];
+  if (!secret || secret !== APP_SECRET) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
+};
+
+app.use('/api', authMiddleware);
 
 const scanLimiter = rateLimit({
   windowMs: 60 * 1000,

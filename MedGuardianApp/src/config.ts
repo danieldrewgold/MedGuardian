@@ -27,3 +27,12 @@ function getApiUrl(): string {
 }
 
 export const API_URL = getApiUrl();
+
+// API secret — must match the server's APP_SECRET env var
+export const API_SECRET = 'mg_s3cur3_k8x2pQ7vR4wL9mN1bZ';
+
+/** Standard headers for all API requests */
+export const apiHeaders = {
+  'Content-Type': 'application/json',
+  'x-app-secret': API_SECRET,
+};

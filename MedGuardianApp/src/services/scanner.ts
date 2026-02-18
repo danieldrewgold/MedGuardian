@@ -1,5 +1,5 @@
 import { File } from 'expo-file-system';
-import { API_URL } from '../config';
+import { API_URL, apiHeaders } from '../config';
 
 export interface ScanResult {
   name: string;
@@ -73,7 +73,7 @@ export async function scanBase64Image(
 
   const response = await fetch(`${API_URL}/api/scan`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders,
     body: JSON.stringify(body),
   });
 
@@ -93,7 +93,7 @@ export async function scanBase64Image(
 export async function identifyPills(base64: string): Promise<PillIdResult[]> {
   const response = await fetch(`${API_URL}/api/pill-id`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders,
     body: JSON.stringify({ image: base64 }),
   });
 
